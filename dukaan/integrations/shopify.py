@@ -64,21 +64,28 @@ def list_products(limit=50):
 
 
 def create_digital_product(name, price, description, pdf_path=None, image_paths=(), seo_keywords=()):
+    return create_product(name, price, description, "digital", pdf_path, image_paths, seo_keywords)
+
+
+def create_product(name, price, description, kind="digital", pdf_path=None, image_paths=(), seo_keywords=(),
+                   stock=None):
+    physical = kind == "physical"
     q = """mutation($p:ProductCreateInput!){ productCreate(product:$p){
       product{ id handle variants(first:1){ nodes{ id } } } userErrors{ field message } } }"""
     res = _gql(q, {"p": {"title": name, "descriptionHtml": _html(description), "status": "ACTIVE",
-                         "productType": "Digital download", "tags": list(seo_keywords)[:250]}})["productCreate"]
+                         "productType": "Physical" if physical else "Digital download", "tags": list(seo_keywords)[:250]}})["productCreate"]
     _user_errors(res)
     prod = res["product"]
     vid = prod["variants"]["nodes"][0]["id"]
     q2 = """mutation($id:ID!, $v:[ProductVariantsBulkInput!]!){ productVariantsBulkUpdate(productId:$id, variants:$v){
       userErrors{ field message } } }"""
     _user_errors(_gql(q2, {"id": prod["id"], "v": [{"id": vid, "price": f"{float(price):.2f}",
-                                                      "inventoryItem": {"requiresShipping": False}}]})
+                                                      "inventoryItem": {"requiresShipping": physical}}]})
                  ["productVariantsBulkUpdate"])
-    return {"id": prod["id"], "handle": prod["handle"], "platform": NAME,
-            "note": "Add product images in Shopify admin. The PDF is delivered on WhatsApp by Dukaan AI "
-                    "(or attach it with Shopify's free Digital Downloads app)."}
+    note = ("Add product photos and set the stock quantity in Shopify admin." if physical else
+            "Add product images in Shopify admin. The PDF is delivered on WhatsApp by Dukaan AI "
+            "(or attach it with Shopify's free Digital Downloads app).")
+    return {"id": prod["id"], "handle": prod["handle"], "platform": NAME, "kind": kind, "note": note}
 
 
 def update_product(product_id, name=None, description=None, price=None):

@@ -84,16 +84,22 @@ def upload_file(path):
     return r.json().get("file", {})
 
 
-def create_digital_product(name, price, description, pdf_path=None, image_paths=(), seo_keywords=()):
-    """Create a digital product. In V3 the PDF is attached so Wix can sell it directly."""
+def create_product(name, price, description, kind="digital", pdf_path=None, image_paths=(), seo_keywords=(),
+                   stock=None):
+    """Create a digital (PDF) or physical (shipped) product."""
+    physical = kind == "physical"
     images = [upload_file(p)["url"] for p in image_paths if p and Path(p).exists()][:3]
     if catalog_version() == "V3_CATALOG":
         variant = {"price": {"actualPrice": {"amount": f"{float(price):g}"}}, "visible": True,
-                   "inventoryItem": {"inStock": True}}
-        if pdf_path and Path(pdf_path).exists():
-            variant["digitalProperties"] = {"digitalFile": {"id": upload_file(pdf_path)["id"]}}
-        product = {"name": name, "productType": "DIGITAL", "plainDescription": description,
-                   "variantsInfo": {"variants": [variant]}}
+                   "inventoryItem": {"quantity": int(stock)} if (physical and stock is not None) else {"inStock": True}}
+        product = {"name": name, "plainDescription": description, "variantsInfo": {"variants": [variant]}}
+        if physical:
+            product.update(productType="PHYSICAL", physicalProperties={})
+            variant["physicalProperties"] = {}
+        else:
+            product["productType"] = "DIGITAL"
+            if pdf_path and Path(pdf_path).exists():
+                variant["digitalProperties"] = {"digitalFile": {"id": upload_file(pdf_path)["id"]}}
         if images:
             product["media"] = {"itemsInfo": {"items": [{"url": u, "altText": name} for u in images]}}
         if seo_keywords:
@@ -101,19 +107,24 @@ def create_digital_product(name, price, description, pdf_path=None, image_paths=
                                                                       "content": ", ".join(seo_keywords)}}]}
         res = _req("POST", "/stores/v3/products-with-inventory", {"product": product, "fields": ["URL"]})
         p = res.get("product", {})
-        return {"id": p.get("id"), "name": p.get("name"), "url": p.get("url"),
-                "sellable_on_wix": "digitalProperties" in variant,
+        return {"id": p.get("id"), "name": p.get("name"), "url": p.get("url"), "kind": kind,
+                "sellable_on_wix": physical or "digitalProperties" in variant,
                 "inventory_error": (res.get("inventoryResults") or {}).get("error")}
-    # Catalog V1: description is HTML. The PDF is delivered on WhatsApp by this app.
+    # Catalog V1: description is HTML.
     html = "".join(f"<p>{line}</p>" for line in description.split("\n") if line.strip())
     res = _req("POST", "/stores/v1/products", {"product": {
-        "name": name, "productType": "digital", "description": html, "visible": True,
+        "name": name, "productType": "physical" if physical else "digital", "description": html, "visible": True,
         "priceData": {"price": float(price)}}})
     p = res.get("product", {})
     if images and p.get("id"):
         _req("POST", f"/stores/v1/products/{p['id']}/media", {"media": [{"url": u} for u in images]})
-    return {"id": p.get("id"), "name": p.get("name"),
-            "note": "Catalog V1: attach the PDF in the Wix dashboard if you also want Wix to deliver it."}
+    note = ("Catalog V1: set the stock quantity in the Wix dashboard." if physical else
+            "Catalog V1: attach the PDF in the Wix dashboard if you also want Wix to deliver it.")
+    return {"id": p.get("id"), "name": p.get("name"), "kind": kind, "note": note}
+
+
+def create_digital_product(name, price, description, pdf_path=None, image_paths=(), seo_keywords=()):
+    return create_product(name, price, description, "digital", pdf_path, image_paths, seo_keywords)
 
 
 def update_product(product_id, name=None, description=None, price=None):

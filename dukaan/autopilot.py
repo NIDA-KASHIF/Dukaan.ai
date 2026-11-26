@@ -179,6 +179,11 @@ def _is_urdu(text):
 def _reminder(order, second, urdu):
     items = ", ".join(i["name"] for i in order["items"])
     total = f"{float(order['total']):g} {order['currency']}"
+    if order.get("status") == "cod_pending":
+        if urdu:
+            return f"السلام علیکم! آپ کا کیش آن ڈیلیوری آرڈر ({items}، کل {total}) تیار ہے۔ تصدیق کے لیے CONFIRM لکھ کر بھیج دیں، پارسل روانہ کر دیا جائے گا 🤍"
+        return (f"Hi! Your cash-on-delivery order ({items}, total {total}) is ready. Reply CONFIRM and we'll ship "
+                "your parcel 🤍")
     if urdu:
         if second:
             return f"السلام علیکم! آپ کا آرڈر ({items}) ابھی بھی محفوظ ہے۔ {total} ادا کر کے اسکرین شاٹ یہاں بھیج دیں، فائل فوراً مل جائے گی۔ کوئی سوال ہو تو بتائیں 🤍"
@@ -196,7 +201,7 @@ def recovery_tick(now=None):
     now = now or time.time()
     sent = []
     for o in db.list_orders(300):
-        if o["status"] != "awaiting_payment":
+        if o["status"] not in ("awaiting_payment", "cod_pending"):
             continue
         last_msg = db.last_customer_message_time(o["customer"]) or o["created"]
         if now - last_msg > WINDOW:
@@ -248,28 +253,34 @@ def build_brief(with_idea=True):
     start_y = dt.datetime.combine(today - dt.timedelta(days=1), dt.time(), tz).timestamp()
     start_t = start_y + 86400
     orders = db.list_orders(500)
-    delivered_y = [o for o in orders if o["status"] == "delivered" and start_y <= (o.get("paid_at") or o["created"]) < start_t]
+    delivered_y = [o for o in orders if o.get("paid_at") and start_y <= o["paid_at"] < start_t]
     revenue = sum(float(o["total"]) for o in delivered_y)
-    delivered_t = [o for o in orders if o["status"] == "delivered" and (o.get("paid_at") or o["created"]) >= start_t]
-    unpaid = [o for o in orders if o["status"] == "awaiting_payment" and time.time() - o["created"] < 72 * 3600]
+    delivered_t = [o for o in orders if o.get("paid_at") and o["paid_at"] >= start_t]
+    to_ship = [o for o in orders if o["status"] == "to_ship"]
+    low = [p for p in db.list_products() if p["kind"] == "physical" and p["stock"] is not None and p["stock"] <= 3]
+    unpaid = [o for o in orders if o["status"] in ("awaiting_payment", "cod_pending") and time.time() - o["created"] < 72 * 3600]
     review = [o for o in orders if o["status"] == "payment_review"]
     pending = db.pending_approvals()
-    week = [o for o in orders if o["status"] == "delivered" and time.time() - o["created"] < 7 * 86400]
+    week = [o for o in orders if o.get("paid_at") and time.time() - o["created"] < 7 * 86400]
     best = {}
     for o in week:
         for i in o["items"]:
-            best[i["name"]] = best.get(i["name"], 0) + 1
+            best[i["name"]] = best.get(i["name"], 0) + int(i.get("qty") or 1)
     top = max(best, key=best.get) if best else None
     recovered = [o for o in delivered_y if (o.get("nudges") or 0) > 0]
     cur = config.load_profile().get("currency", "")
     lines = [f"🌅 *Good morning! {config.load_profile().get('store_name')} — {today:%d %b}*",
-             f"💰 Yesterday: {len(delivered_y)} sale(s), {revenue:g} {cur}"]
+             f"💰 Yesterday: {len(delivered_y)} paid order(s), {revenue:g} {cur}"]
     if delivered_t:
-        lines.append(f"📈 Today so far: {len(delivered_t)} sale(s), {sum(float(o['total']) for o in delivered_t):g} {cur}")
+        lines.append(f"📈 Today so far: {len(delivered_t)} paid order(s), {sum(float(o['total']) for o in delivered_t):g} {cur}")
     if recovered:
         lines.append(f"🔁 {len(recovered)} of them came back after a reminder")
     if top:
         lines.append(f"🏆 Best seller this week: {top} ({best[top]})")
+    if to_ship:
+        lines.append(f"📦 Parcels to pack & ship: {len(to_ship)} (" + ", ".join(f"#{o['id']}" for o in to_ship[:8]) + ")")
+    if low:
+        lines.append("⚠️ Low stock: " + ", ".join(f"{p['name']} ({p['stock']})" for p in low[:6]))
     lines.append(f"⏳ Unpaid orders: {len(unpaid)}" + (" (reminders are being sent)" if unpaid and config.RECOVERY else ""))
     if review:
         lines.append(f"🧾 Screenshots waiting for bank confirmation: {len(review)}")

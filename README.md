@@ -1,6 +1,6 @@
 # 🛍️ Dukaan AI — AI Store Manager for any online store + WhatsApp
 
-**Dukaan AI** is an AI manager for your online store. It **designs digital products itself** (planners, journals, worksheets, coloring books), writes their listings and SEO, publishes them to your online store (**Wix, Shopify, WooCommerce**, or **any other platform** through ready-to-paste listings), writes your social media posts, and sells on WhatsApp: it chats with customers, takes the order, checks the payment screenshot and sends the PDF.
+**Dukaan AI** is an AI manager for your online store, for **physical products** (shipped by courier, with stock, delivery charges and cash on delivery) and **digital products** (PDFs sent on WhatsApp). It **designs digital products itself** (planners, journals, worksheets, coloring books), writes their listings and SEO, publishes them to your online store (**Wix, Shopify, WooCommerce**, or **any other platform** through ready-to-paste listings), writes your social media posts, and sells on WhatsApp: it chats with customers, takes the order (with the delivery address for physical items), checks the payment, sends the PDF or prepares the parcel, and shares the courier tracking number.
 
 It runs on **free AI**: Google Gemini, Groq or OpenRouter. Each user adds their own free key.
 
@@ -15,8 +15,22 @@ It runs on **free AI**: Google Gemini, Groq or OpenRouter. Each user adds their 
 | ✍️ **Listing Writer** | Titles, descriptions, 13 SEO tags and price suggestions |
 | 📣 **Marketing** | Instagram / TikTok / Facebook captions, hashtags, video scripts, WhatsApp broadcasts, 7- or 30-day content plans |
 | 📈 **Store Growth** | Reviews your store and orders, points out weak spots, suggests new products and better descriptions |
-| 💬 **Sales (WhatsApp)** | Answers customers, creates orders, shares bank details, checks payment screenshots, sends the PDF |
+| 💬 **Sales (WhatsApp)** | Answers customers, creates orders, collects delivery addresses, offers bank transfer or cash on delivery, checks payments, sends PDFs, shares tracking |
 | 🧠 **New skills** | If you ask for work no agent covers, the Manager **writes itself a new skill** and reuses it next time |
+
+### 📦 Physical and 📄 digital products, side by side
+
+| | Physical products | Digital products |
+|---|---|---|
+| Add | ☰ → Products → Type: *Physical*, with stock and photos (or ask the Manager) | Ask the Product Designer to make one, or upload your PDF |
+| Order | The Sales agent collects name, phone, full address and city | Just the product |
+| Price | Product + delivery charge (free above your limit) + optional COD charge | Product price |
+| Payment | Bank transfer (screenshot + bank SMS match) **or Cash on Delivery** (customer replies `CONFIRM`) | Bank transfer |
+| After payment | Stock goes down, you get a **packing slip** on WhatsApp, the customer is told it will ship | Files are sent on WhatsApp at once |
+| Shipping | Send `SHIPPED 12 TCS 77123456` (or tap **Mark shipped**): the customer gets the courier and tracking number | — |
+| Delivered | `DELIVERED 12` (or **Mark delivered**); COD orders count as paid | Automatic |
+
+One order can mix both: the PDF goes out at once and the parcel ships. Set delivery charges, free-delivery limit, COD, delivery time and couriers in **☰ → Store settings**. The morning brief lists parcels to ship and products running low on stock.
 
 ### 🚀 Dukaan Autopilot: the daily jobs you no longer do by hand
 
@@ -92,7 +106,7 @@ Set `STORE_PLATFORM` in `.env` (or leave it on `auto`).
 
 | Platform | What Dukaan AI does | Setup |
 |---|---|---|
-| **Shopify** | Lists products and orders, creates digital products, updates titles, descriptions and prices | Shopify admin → **Settings → Apps and sales channels → Develop apps → Create an app** → Admin API scopes `read_products`, `write_products`, `read_orders` → **Install** → copy the Admin API access token. Put `SHOPIFY_STORE` (e.g. `mystore.myshopify.com`) and `SHOPIFY_TOKEN` in `.env`. |
+| **Shopify** | Lists products and orders, creates physical or digital products, updates titles, descriptions and prices | Shopify admin → **Settings → Apps and sales channels → Develop apps → Create an app** → Admin API scopes `read_products`, `write_products`, `read_orders` → **Install** → copy the Admin API access token. Put `SHOPIFY_STORE` (e.g. `mystore.myshopify.com`) and `SHOPIFY_TOKEN` in `.env`. |
 | **WooCommerce** (WordPress) | Same as above | WordPress → **WooCommerce → Settings → Advanced → REST API → Add key** (Read/Write). Put `WOO_URL` (https://yourshop.com), `WOO_KEY` and `WOO_SECRET` in `.env`. |
 | **Wix** | Same as above; on Wix Catalog V3 the PDF is attached too | [manage.wix.com/account/api-keys](https://manage.wix.com/account/api-keys) → **Generate API Key** with **Wix Stores**, **Media Manager** and **eCommerce** permissions. `WIX_SITE_ID` is the long ID after `manage.wix.com/dashboard/` in your site's dashboard address. |
 | **Any other platform** (Etsy, Daraz, Gumroad, Payhip, Instagram shop, your own website…) | **Manual mode:** the AI writes complete, ready-to-paste listings (title, description, tags, price, files) into `data/listings/` and shows them under **☰ → Products**. Sales and PDF delivery still run on WhatsApp. | Set `STORE_PLATFORM=manual` and `STORE_PLATFORM_NAME=Etsy` (or your platform). Nothing else needed. |
@@ -113,7 +127,7 @@ Product images and downloadable files: Shopify and WooCommerce products are crea
 > **Note on your number:** if the number is currently used in the WhatsApp Business **app**, connecting it to the Cloud API usually moves it off the app. Some accounts are offered "coexistence", which keeps both working. Otherwise, use a separate number for the bot.
 
 **As the owner, you can send on WhatsApp:**
-`PENDING` (what is waiting for approval) · `APPROVE 5` · `REJECT 5` · `BRIEF` (today's report) · `BANK <paste bank SMS>` · `RESET` · or any task, e.g. *"make a new product"*.
+`PENDING` (what is waiting for approval) · `APPROVE 5` · `REJECT 5` · `BRIEF` (today's report) · `SHIPPED 12 TCS 77123456` · `DELIVERED 12` · `BANK <paste bank SMS>` · `RESET` · or any task, e.g. *"make a new product"*.
 
 ### ☁️ Running 24/7 (Render / Railway)
 - **Render:** on render.com choose **New → Blueprint** and select this repo (`render.yaml` sets everything up). Then add your keys. After deploying, add `/webhook` to the end of the link Render gives you and paste it into Meta. Open the Render link itself to use the app (log in with `APP_PASSWORD`).

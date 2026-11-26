@@ -47,15 +47,24 @@ def list_products(limit=50):
             for p in _req("GET", "/products", params={"per_page": min(limit, 100)})]
 
 
-def create_digital_product(name, price, description, pdf_path=None, image_paths=(), seo_keywords=()):
+def create_product(name, price, description, kind="digital", pdf_path=None, image_paths=(), seo_keywords=(),
+                   stock=None):
+    physical = kind == "physical"
     first = (description or "").strip().split("\n")[0]
-    p = _req("POST", "/products", {
-        "name": name, "type": "simple", "status": "publish", "regular_price": f"{float(price):g}",
-        "description": _html(description), "short_description": _html(first),
-        "virtual": True, "downloadable": True, "tags": [{"name": k} for k in list(seo_keywords)[:20]]})
-    return {"id": p["id"], "url": p.get("permalink"), "platform": NAME,
-            "note": "Add images and (optionally) the downloadable file in WordPress. "
-                    "Dukaan AI delivers the PDF on WhatsApp."}
+    body = {"name": name, "type": "simple", "status": "publish", "regular_price": f"{float(price):g}",
+            "description": _html(description), "short_description": _html(first),
+            "virtual": not physical, "downloadable": not physical,
+            "tags": [{"name": k} for k in list(seo_keywords)[:20]]}
+    if physical and stock is not None:
+        body.update(manage_stock=True, stock_quantity=int(stock))
+    p = _req("POST", "/products", body)
+    note = ("Add product photos in WordPress." if physical else
+            "Add images and (optionally) the downloadable file in WordPress. Dukaan AI delivers the PDF on WhatsApp.")
+    return {"id": p["id"], "url": p.get("permalink"), "platform": NAME, "kind": kind, "note": note}
+
+
+def create_digital_product(name, price, description, pdf_path=None, image_paths=(), seo_keywords=()):
+    return create_product(name, price, description, "digital", pdf_path, image_paths, seo_keywords)
 
 
 def update_product(product_id, name=None, description=None, price=None):

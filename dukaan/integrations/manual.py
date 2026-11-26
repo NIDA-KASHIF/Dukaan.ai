@@ -34,15 +34,24 @@ def list_products(limit=50):
 
 
 def create_digital_product(name, price, description, pdf_path=None, image_paths=(), seo_keywords=()):
+    return create_product(name, price, description, "digital", pdf_path, image_paths, seo_keywords)
+
+
+def create_product(name, price, description, kind="digital", pdf_path=None, image_paths=(), seo_keywords=(),
+                   stock=None):
     stamp = time.strftime("%Y%m%d-%H%M")
     safe = "".join(c if c.isalnum() else "_" for c in name)[:50]
     path = _dir() / f"{stamp}_{safe}.md"
     cur = config.load_profile().get("currency", "")
-    text = (f"# {name}\n\n**Price:** {price:g} {cur}\n\n## Description\n{description}\n\n"
-            f"## Tags / keywords\n{', '.join(seo_keywords) or '-'}\n\n"
-            f"## Files\n- PDF: {pdf_path or '-'}\n" + "".join(f"- Image: {p}\n" for p in image_paths))
+    ship = config.load_profile().get("shipping") or {}
+    kind_line = (f"**Type:** Physical (shipped) · Stock: {stock if stock is not None else 'not tracked'} · "
+                 f"Delivery: {ship.get('delivery_days', '')}\n\n" if kind == "physical" else
+                 "**Type:** Digital download (PDF)\n\n")
+    text = (f"# {name}\n\n**Price:** {float(price):g} {cur}\n\n{kind_line}## Description\n{description}\n\n"
+            f"## Tags / keywords\n{', '.join(seo_keywords) or '-'}\n\n" +
+            (f"## Files\n- PDF: {pdf_path or '-'}\n" if kind != "physical" else "## Photos\n") + "".join(f"- Image: {p}\n" for p in image_paths))
     path.write_text(text, encoding="utf-8")
-    return {"listing_file": str(path), "platform": NAME,
+    return {"listing_file": str(path), "platform": NAME, "kind": kind,
             "note": f"Ready to paste into {config.STORE_PLATFORM_NAME or 'your platform'}."}
 
 

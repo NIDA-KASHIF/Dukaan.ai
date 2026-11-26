@@ -51,7 +51,13 @@ def conn():
 
 MIGRATIONS = ["ALTER TABLE orders ADD COLUMN nudges INTEGER DEFAULT 0",
               "ALTER TABLE orders ADD COLUMN last_nudge REAL",
-              "ALTER TABLE orders ADD COLUMN paid_at REAL"]
+              "ALTER TABLE orders ADD COLUMN paid_at REAL",
+              "ALTER TABLE products ADD COLUMN kind TEXT DEFAULT 'digital'",
+              "ALTER TABLE products ADD COLUMN stock INTEGER",
+              "ALTER TABLE products ADD COLUMN images TEXT DEFAULT '[]'",
+              "ALTER TABLE orders ADD COLUMN payment_method TEXT DEFAULT 'bank'",
+              "ALTER TABLE orders ADD COLUMN shipping TEXT DEFAULT '{}'",
+              "ALTER TABLE orders ADD COLUMN fulfillment TEXT DEFAULT '{}'"]
 
 
 def init():
@@ -93,63 +99,78 @@ def set_approval(aid, status, result=""):
 
 
 # ---------- products ----------
-def add_product(name, price, currency, description, files, wix_id=""):
-    return q("INSERT INTO products(name,price,currency,description,files,wix_id,created) VALUES(?,?,?,?,?,?,?)",
-             (name, float(price), currency, description, json.dumps(files), wix_id, time.time()))
+def add_product(name, price, currency, description, files=(), wix_id="", kind="digital", stock=None, images=()):
+    """kind: 'digital' (files sent on WhatsApp) or 'physical' (shipped; stock None = unlimited)."""
+    kind = "physical" if str(kind).lower().startswith("phys") else "digital"
+    return q("INSERT INTO products(name,price,currency,description,files,wix_id,created,kind,stock,images) "
+             "VALUES(?,?,?,?,?,?,?,?,?,?)",
+             (name, float(price), currency, description, json.dumps(list(files)), wix_id, time.time(), kind,
+              None if stock in (None, "") else int(stock), json.dumps(list(images))))
+
+
+def _product_row(r):
+    r["files"] = json.loads(r["files"] or "[]")
+    r["images"] = json.loads(r.get("images") or "[]")
+    r["kind"] = r.get("kind") or "digital"
+    return r
 
 
 def list_products(active_only=True):
     rows = q("SELECT * FROM products" + (" WHERE active=1" if active_only else "") + " ORDER BY id")
-    for r in rows:
-        r["files"] = json.loads(r["files"] or "[]")
-    return rows
+    return [_product_row(r) for r in rows]
 
 
 def get_product(pid):
     r = q("SELECT * FROM products WHERE id=?", (pid,), one=True)
-    if r:
-        r["files"] = json.loads(r["files"] or "[]")
-    return r
+    return _product_row(r) if r else None
 
 
 def update_product(pid, **fields):
-    if "files" in fields:
-        fields["files"] = json.dumps(fields["files"])
+    for k in ("files", "images"):
+        if k in fields:
+            fields[k] = json.dumps(fields[k])
     sets = ",".join(f"{k}=?" for k in fields)
     q(f"UPDATE products SET {sets} WHERE id=?", (*fields.values(), pid))
 
 
 # ---------- orders ----------
-def add_order(customer, customer_name, items, total, currency):
-    return q("INSERT INTO orders(created,customer,customer_name,items,total,currency) VALUES(?,?,?,?,?,?)",
-             (time.time(), customer, customer_name, json.dumps(items), total, currency))
+def add_order(customer, customer_name, items, total, currency, status="awaiting_payment",
+              payment_method="bank", shipping=None):
+    return q("INSERT INTO orders(created,customer,customer_name,items,total,currency,status,payment_method,shipping) "
+             "VALUES(?,?,?,?,?,?,?,?,?)",
+             (time.time(), customer, customer_name, json.dumps(items), total, currency, status, payment_method,
+              json.dumps(shipping or {}, ensure_ascii=False)))
+
+
+def _order_row(r):
+    r["items"] = json.loads(r["items"] or "[]")
+    r["payment"] = json.loads(r["payment"] or "{}")
+    r["shipping"] = json.loads(r.get("shipping") or "{}")
+    r["fulfillment"] = json.loads(r.get("fulfillment") or "{}")
+    r["payment_method"] = r.get("payment_method") or "bank"
+    return r
 
 
 def get_order(oid):
     r = q("SELECT * FROM orders WHERE id=?", (oid,), one=True)
-    if r:
-        r["items"] = json.loads(r["items"] or "[]")
-        r["payment"] = json.loads(r["payment"] or "{}")
-    return r
+    return _order_row(r) if r else None
 
 
 def open_order_for(customer):
-    r = q("SELECT id FROM orders WHERE customer=? AND status IN ('awaiting_payment','payment_review') "
+    r = q("SELECT id FROM orders WHERE customer=? AND status IN ('awaiting_payment','payment_review','cod_pending') "
           "ORDER BY id DESC LIMIT 1", (customer,), one=True)
     return get_order(r["id"]) if r else None
 
 
 def list_orders(limit=100):
     rows = q("SELECT * FROM orders ORDER BY id DESC LIMIT ?", (limit,))
-    for r in rows:
-        r["items"] = json.loads(r["items"] or "[]")
-        r["payment"] = json.loads(r["payment"] or "{}")
-    return rows
+    return [_order_row(r) for r in rows]
 
 
 def update_order(oid, **fields):
-    if "payment" in fields:
-        fields["payment"] = json.dumps(fields["payment"], ensure_ascii=False)
+    for k in ("payment", "shipping", "fulfillment"):
+        if k in fields:
+            fields[k] = json.dumps(fields[k], ensure_ascii=False)
     sets = ",".join(f"{k}=?" for k in fields)
     q(f"UPDATE orders SET {sets} WHERE id=?", (*fields.values(), oid))
 
@@ -160,6 +181,11 @@ def payment_ref_used(ref):
 
 def mark_payment_ref(ref, order_id):
     q("INSERT OR IGNORE INTO used_payments(ref,order_id,created) VALUES(?,?,?)", (ref, order_id, time.time()))
+
+
+def change_stock(pid, delta):
+    """Add (or with a negative delta, remove) stock. Unlimited stock (NULL) stays unlimited."""
+    q("UPDATE products SET stock = MAX(0, stock + ?) WHERE id=? AND stock IS NOT NULL", (int(delta), pid))
 
 
 # ---------- chat history ----------

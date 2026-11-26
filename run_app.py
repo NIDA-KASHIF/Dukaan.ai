@@ -169,6 +169,19 @@ def api_deliver(oid):
     return jsonify(tools.deliver(oid))
 
 
+@app.post("/api/orders/<int:oid>/ship")
+@owner_only
+def api_ship(oid):
+    d = request.get_json(silent=True) or {}
+    return jsonify(tools.mark_shipped.fn(oid, d.get("courier", ""), d.get("tracking", ""), d.get("tracking_url", "")))
+
+
+@app.post("/api/orders/<int:oid>/delivered")
+@owner_only
+def api_delivered(oid):
+    return jsonify(tools.mark_delivered.fn(oid))
+
+
 @app.get("/api/products")
 @owner_only
 def api_products():
@@ -184,8 +197,11 @@ def api_products():
 def api_add_product():
     d = request.get_json(silent=True) or {}
     files_ = [str(config.PRODUCTS_DIR / Path(f).name) for f in d.get("files", [])]
+    images = [str(config.PRODUCTS_DIR / Path(f).name) for f in d.get("images", [])]
+    stock = d.get("stock")
     pid = db.add_product(d.get("name", "Product"), float(d.get("price") or 0),
-                         config.load_profile().get("currency", "PKR"), d.get("description", ""), files_)
+                         config.load_profile().get("currency", "PKR"), d.get("description", ""), files_,
+                         kind=d.get("kind", "digital"), stock=None if stock in (None, "") else int(stock), images=images)
     return jsonify(id=pid)
 
 
@@ -193,7 +209,7 @@ def api_add_product():
 @owner_only
 def api_edit_product(pid):
     d = request.get_json(silent=True) or {}
-    fields = {k: d[k] for k in ("name", "price", "description", "active") if k in d}
+    fields = {k: d[k] for k in ("name", "price", "description", "active", "stock") if k in d}
     db.update_product(pid, **fields)
     return jsonify(ok=True)
 

@@ -107,12 +107,17 @@ DEFAULT_PROFILE = {
     "currency": "PKR",
     "language": "Reply in the customer's language (Urdu, Roman Urdu or English).",
     "tone": "Warm, polite, short messages.",
-    "about": "We sell printable digital products (PDF planners, journals, worksheets, coloring books).",
+    "about": "We sell physical products (shipped to your door) and digital products (PDF on WhatsApp).",
     "payment_methods": [
         {"type": "Bank transfer", "bank": "", "account_title": "", "account_number": "", "iban": ""}
     ],
     "policies": "Digital products are delivered as PDF on WhatsApp after payment is confirmed. No refunds on digital files once delivered.",
     "brand_colors": {"primary": "#8C2F45", "accent": "#B08A45", "paper": "#FFFDF9"},
+    "shipping": {
+        "flat_fee": 250, "free_over": 5000, "cod": True, "cod_fee": 0,
+        "delivery_days": "3-5 working days", "couriers": "TCS, Leopards, M&P, PostEx, Trax",
+        "areas": "All over Pakistan",
+    },
     "notes": [],
 }
 

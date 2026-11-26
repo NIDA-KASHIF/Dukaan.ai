@@ -49,6 +49,14 @@ def handle_owner(msg):
                  "probable": f"🏦 Probably order #{r.get('order_id')}, but the ID/name do not match. Check before approving.",
                  "duplicate": "This bank SMS was already recorded.",
                  }.get(r["status"], f"Not recorded: {r.get('reason', '')}")
+    elif re.match(r"^shipped\s+#?(\d+)\s+(\S+)\s+(\S+)(?:\s+(\S+))?", text, re.I):
+        m2 = re.match(r"^shipped\s+#?(\d+)\s+(\S+)\s+(\S+)(?:\s+(\S+))?", text, re.I)
+        r = tools.mark_shipped.fn(int(m2.group(1)), m2.group(2), m2.group(3), m2.group(4) or "")
+        reply = f"🚚 Order #{m2.group(1)} marked shipped; the customer got the tracking number." if r.get("shipped") else r.get("error")
+    elif re.match(r"^delivered\s+#?(\d+)$", text, re.I):
+        oid = int(re.match(r"^delivered\s+#?(\d+)$", text, re.I).group(1))
+        r = tools.mark_delivered.fn(oid)
+        reply = f"🎉 Order #{oid} marked delivered." if r.get("delivered") else r.get("error")
     elif text.lower() in ("brief", "today", "report"):
         reply = autopilot.build_brief()
     elif text.lower() in ("reset", "new chat"):
@@ -79,6 +87,12 @@ def handle_customer_text(msg):
     if not text.strip():
         return None
     db.touch_customer(msg["from"], msg.get("name", ""))
+    if text.strip().upper().strip(".! ") in ("CONFIRM", "CONFIRMED", "YES CONFIRM"):
+        o = db.open_order_for(msg["from"])
+        if o and o["status"] == "cod_pending":
+            db.add_message(channel, "user", text)
+            tools.deliver(o["id"])
+            return "cod_confirmed"
     with _sales_lock:
         hist = db.history(channel, 12)
         db.add_message(channel, "user", text)
@@ -99,6 +113,11 @@ def handle_payment(msg):
     if not order:
         reply = ("Thank you! I could not find an open order for you. Please tell me which product you want "
                  "and I will create the order first. 🤍")
+        whatsapp.send_text(customer, reply)
+        return reply
+    if order.get("payment_method") == "cod":
+        reply = ("Thank you! Your order is cash on delivery, so no payment is needed now. "
+                 + ("Please reply CONFIRM to confirm it. 🤍" if order["status"] == "cod_pending" else "🤍"))
         whatsapp.send_text(customer, reply)
         return reply
     img, mime = whatsapp.download_media(msg["media_id"])

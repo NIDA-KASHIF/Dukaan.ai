@@ -58,8 +58,8 @@ def make_pdf():
 
 def test_publish_needs_approval_then_runs():
     calls = []
-    real = manual.create_digital_product
-    manual.create_digital_product = lambda *a, **k: calls.append(a) or real(*a, **k)
+    real = manual.create_product
+    manual.create_product = lambda *a, **k: calls.append(a) or real(*a, **k)
     pdf = make_pdf()
     llm.chat = FakeLLM([("store_publish_product", {"name": "Ramadan Planner", "price": 2500,
                                                  "description": "30 days", "pdf_path": pdf}),
@@ -379,6 +379,120 @@ def test_owner_forwards_bank_sms_on_whatsapp_and_api():
     r = cl.post("/api/bank-sms?token=tok123", json={"message": "PKR 999 received from X. TID 12312312"},
                 environ_base={"REMOTE_ADDR": "8.8.8.8"})
     assert r.status_code == 200 and r.get_json()["status"] == "waiting"
+
+
+# ----------------------------------------------------------------- physical products
+def _tote(stock=5, price=3500):
+    return db.add_product("Crochet Tote", price, "PKR", "Handmade bag", kind="physical", stock=stock)
+
+
+def _as_customer(wa, name="Cust"):
+    agents._current_customer.update(wa=wa, name=name)
+    db.touch_customer(wa, name)
+    db.add_message(f"wa:{wa}", "user", "hi")
+
+
+ADDR = dict(name="Amna Khan", phone="03001234567", address="House 12, Street 5, G-11/2", city="Islamabad")
+
+
+def test_physical_order_needs_address_and_charges_delivery():
+    _clear_open_orders()
+    tid = _tote()
+    _as_customer("923500000001", "Amna")
+    assert "Ask the customer for" in agents.start_order.fn([tid])["error"]
+    r = agents.start_order.fn([tid], [1], "bank", **ADDR)
+    assert r["delivery_charges"] == 250 and r["total"] == 3750
+    r2 = agents.start_order.fn([tid], [2], "bank", **ADDR)
+    assert r2["delivery_charges"] == 0 and r2["total"] == 7000   # free over 5000
+    assert "Only 5" in agents.start_order.fn([tid], [6], "bank", **ADDR)["error"]
+
+
+def test_physical_bank_payment_ships_not_files():
+    _clear_open_orders()
+    tid = _tote(stock=4)
+    c = "923500000002"
+    _as_customer(c, "Bilal")
+    oid = agents.start_order.fn([tid], [2], "bank", **ADDR)["order_id"]   # 7000, free delivery
+    SENT.clear()
+    _screenshot(c, "TID70007000", amount=7000)
+    r = autopilot.record_bank_sms("PKR 7,000 received from AMNA KHAN. TID 70007000", source="t")
+    assert r["status"] == "delivered"
+    o = db.get_order(oid)
+    assert o["status"] == "to_ship" and o["paid_at"]
+    assert db.get_product(tid)["stock"] == 2
+    assert not [x for x in SENT if x[0] == "doc"]
+    assert any("PACK & SHIP" in x[2] for x in SENT if x[0] == "text" and x[1] == config.OWNER_WHATSAPP)
+    whatsapp_bot.handle({"from": config.OWNER_WHATSAPP, "type": "text", "id": "s1",
+                         "text": f"SHIPPED {oid} TCS 77123456"})
+    assert db.get_order(oid)["status"] == "shipped"
+    assert any("77123456" in x[2] for x in SENT if x[0] == "text" and x[1] == c)
+    whatsapp_bot.handle({"from": config.OWNER_WHATSAPP, "type": "text", "id": "s2", "text": f"DELIVERED {oid}"})
+    assert db.get_order(oid)["status"] == "delivered"
+
+
+def test_cash_on_delivery_flow():
+    _clear_open_orders()
+    tid = _tote(stock=3)
+    c = "923500000003"
+    _as_customer(c, "Sana")
+    oid = agents.start_order.fn([tid], [1], "cod", **ADDR)["order_id"]
+    o = db.get_order(oid)
+    assert o["status"] == "cod_pending" and o["payment_method"] == "cod"
+    pdf_id = db.list_products()[0]["id"]
+    assert "only for physical" in agents.start_order.fn([tid, pdf_id], None, "cod", **ADDR)["error"]
+    reply = whatsapp_bot.handle({"from": c, "name": "Sana", "type": "image", "media_id": "m", "text": "", "id": "codimg"})
+    assert "cash on delivery" in reply
+    assert whatsapp_bot.handle({"from": c, "name": "Sana", "type": "text", "text": "CONFIRM", "id": "cf"}) == "cod_confirmed"
+    o = db.get_order(oid)
+    assert o["status"] == "to_ship" and not o["paid_at"] and db.get_product(tid)["stock"] == 2
+    tools.mark_delivered.fn(oid)
+    assert db.get_order(oid)["paid_at"]   # COD counts as paid on delivery
+
+
+def test_mixed_order_sends_files_and_ships():
+    _clear_open_orders()
+    tid = _tote(stock=None)
+    pdf_id = db.list_products()[0]["id"]
+    c = "923500000004"
+    _as_customer(c, "Hira")
+    oid = agents.start_order.fn([tid, pdf_id], None, "bank", **ADDR)["order_id"]
+    SENT.clear()
+    res = tools.deliver(oid)
+    assert res["files_sent"] and res["to_ship"] == ["Crochet Tote"]
+    assert db.get_order(oid)["status"] == "to_ship" and db.get_product(tid)["stock"] is None
+
+
+def test_store_adapters_physical_payloads():
+    sent = []
+    wix.catalog_version = lambda: "V3_CATALOG"
+    wix._req = lambda m, path, body=None, params=None: sent.append((path, body)) or {"product": {"id": "w1"}}
+    wix.create_product("Tote", 3500, "Bag", kind="physical", stock=7)
+    prod = sent[-1][1]["product"]
+    assert sent[-1][0] == "/stores/v3/products-with-inventory"
+    assert prod["productType"] == "PHYSICAL" and prod["physicalProperties"] == {}
+    v = prod["variantsInfo"]["variants"][0]
+    assert v["physicalProperties"] == {} and v["inventoryItem"] == {"quantity": 7}
+    config.WOO_URL, config.WOO_KEY, config.WOO_SECRET = "https://shop.test", "ck", "cs"
+    woocommerce.requests.request = lambda m, url, auth=None, json=None, params=None, timeout=None: (
+        sent.append(("woo", json)) or FakeResp({"id": 9}))
+    woocommerce.create_product("Tote", 3500, "Bag", kind="physical", stock=4)
+    w = sent[-1][1]
+    assert w["virtual"] is False and w["manage_stock"] and w["stock_quantity"] == 4
+    config.WOO_URL = config.WOO_KEY = config.WOO_SECRET = ""
+    calls = []
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        calls.append(json)
+        if "productCreate" in json["query"]:
+            return FakeResp({"data": {"productCreate": {"product": {"id": "gid://shopify/Product/2", "handle": "t",
+                             "variants": {"nodes": [{"id": "gid://shopify/ProductVariant/3"}]}}, "userErrors": []}}})
+        return FakeResp({"data": {"productVariantsBulkUpdate": {"userErrors": []}}})
+    config.SHOPIFY_STORE, config.SHOPIFY_TOKEN = "demo", "tok"
+    shopify.requests.post = fake_post
+    shopify.create_product("Tote", 3500, "Bag", kind="physical")
+    assert calls[1]["variables"]["v"][0]["inventoryItem"]["requiresShipping"] is True
+    assert calls[0]["variables"]["p"]["productType"] == "Physical"
+    config.SHOPIFY_STORE, config.SHOPIFY_TOKEN = "", ""
 
 
 if __name__ == "__main__":
