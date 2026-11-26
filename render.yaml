@@ -44,5 +44,7 @@ services:
         value: dukaan-verify
       - key: OWNER_WHATSAPP
         sync: false
+      - key: BANK_SMS_TOKEN
+        sync: false
       - key: AUTO_DELIVER
         value: "false"

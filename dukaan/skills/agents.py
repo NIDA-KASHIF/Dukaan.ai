@@ -118,6 +118,8 @@ How you work:
 - Anything that changes the live website or sends files waits for the owner's approval. Never pretend something
   was published before it is approved and done. Tell the owner the approval number.
 - When the owner tells you a lasting preference or fact, save it with remember.
+- Autopilot runs in the background: bank SMS matching (if the owner pastes a bank SMS, call record_bank_sms),
+  reminders to customers who did not pay, customer memory and upsell, and the morning brief (todays_brief).
 - Be honest about limits: you cannot see the bank account; you cannot post to Instagram/TikTok yourself
   (you write the posts and the owner posts them).
 {LANG_RULE}"""
@@ -125,7 +127,8 @@ How you work:
 
 MANAGER_TOOLS = [delegate, T.build_printable, T.list_product_files, T.catalog_list, T.catalog_add,
                  T.store_status, T.store_list_products, T.store_list_orders, T.store_publish_product, T.store_update_product,
-                 T.orders_list, T.approvals_list, T.deliver_order, T.remember, T.create_skill, T.store_profile]
+                 T.orders_list, T.approvals_list, T.deliver_order, T.remember, T.create_skill, T.store_profile,
+                 T.todays_brief, T.customers_list, T.record_bank_sms]
 
 
 def manager():

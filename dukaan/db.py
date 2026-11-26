@@ -28,6 +28,15 @@ CREATE TABLE IF NOT EXISTS messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   created REAL, channel TEXT, role TEXT, content TEXT
 );
+CREATE TABLE IF NOT EXISTS customers (
+  wa TEXT PRIMARY KEY, name TEXT, first_seen REAL, last_seen REAL,
+  orders INTEGER DEFAULT 0, spent REAL DEFAULT 0, products TEXT DEFAULT '[]', notes TEXT DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS bank_payments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, created REAL, amount REAL, ref TEXT, sender TEXT,
+  raw TEXT, source TEXT, order_id INTEGER, how TEXT
+);
+CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT);
 CREATE TABLE IF NOT EXISTS used_payments (
   ref TEXT PRIMARY KEY, order_id INTEGER, created REAL
 );
@@ -40,9 +49,19 @@ def conn():
     return c
 
 
+MIGRATIONS = ["ALTER TABLE orders ADD COLUMN nudges INTEGER DEFAULT 0",
+              "ALTER TABLE orders ADD COLUMN last_nudge REAL",
+              "ALTER TABLE orders ADD COLUMN paid_at REAL"]
+
+
 def init():
     with _lock, conn() as c:
         c.executescript(SCHEMA)
+        for m in MIGRATIONS:
+            try:
+                c.execute(m)
+            except sqlite3.OperationalError:
+                pass  # column already exists
 
 
 def q(sql, args=(), one=False):
@@ -156,6 +175,65 @@ def history(channel, limit=16):
 
 def clear_history(channel):
     q("DELETE FROM messages WHERE channel=?", (channel,))
+
+
+# ---------- customers ----------
+def touch_customer(wa, name=""):
+    now = time.time()
+    q("INSERT INTO customers(wa,name,first_seen,last_seen) VALUES(?,?,?,?) "
+      "ON CONFLICT(wa) DO UPDATE SET last_seen=excluded.last_seen, "
+      "name=CASE WHEN excluded.name!='' THEN excluded.name ELSE customers.name END", (wa, name or "", now, now))
+
+
+def get_customer(wa):
+    r = q("SELECT * FROM customers WHERE wa=?", (wa,), one=True)
+    if r:
+        r["products"] = json.loads(r["products"] or "[]")
+    return r
+
+
+def add_purchase(wa, total, product_names):
+    c = get_customer(wa) or {"products": []}
+    prods = list(dict.fromkeys(c["products"] + list(product_names)))
+    q("UPDATE customers SET orders=orders+1, spent=spent+?, products=? WHERE wa=?",
+      (float(total), json.dumps(prods, ensure_ascii=False), wa))
+
+
+def list_customers(limit=200):
+    rows = q("SELECT * FROM customers ORDER BY last_seen DESC LIMIT ?", (limit,))
+    for r in rows:
+        r["products"] = json.loads(r["products"] or "[]")
+    return rows
+
+
+def last_customer_message_time(wa):
+    r = q("SELECT MAX(created) AS t FROM messages WHERE channel=? AND role='user'", (f"wa:{wa}",), one=True)
+    return (r or {}).get("t")
+
+
+# ---------- bank payments ----------
+def add_bank_payment(amount, ref, sender, raw, source):
+    return q("INSERT INTO bank_payments(created,amount,ref,sender,raw,source) VALUES(?,?,?,?,?,?)",
+             (time.time(), amount, ref or "", sender or "", raw[:2000], source))
+
+
+def bank_payments(limit=50, unmatched_only=False):
+    sql = "SELECT * FROM bank_payments" + (" WHERE order_id IS NULL" if unmatched_only else "") + " ORDER BY id DESC LIMIT ?"
+    return q(sql, (limit,))
+
+
+def set_bank_match(bid, order_id, how):
+    q("UPDATE bank_payments SET order_id=?, how=? WHERE id=?", (order_id, how, bid))
+
+
+# ---------- key/value ----------
+def kv_get(k, default=None):
+    r = q("SELECT v FROM kv WHERE k=?", (k,), one=True)
+    return r["v"] if r else default
+
+
+def kv_set(k, v):
+    q("INSERT INTO kv(k,v) VALUES(?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v", (k, str(v)))
 
 
 init()

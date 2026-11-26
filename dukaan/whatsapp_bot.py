@@ -6,7 +6,7 @@ Anyone else     -> talks to the Sales agent. A screenshot sent after ordering is
 import re
 import threading
 
-from . import agent, config, db, payments
+from . import agent, autopilot, config, db, payments
 from .integrations import whatsapp
 from .skills import agents, tools
 
@@ -39,6 +39,18 @@ def handle_owner(msg):
     elif text.lower() in ("pending", "approvals"):
         items = db.pending_approvals()
         reply = "\n\n".join(f"#{a['id']}: {a['summary'][:300]}" for a in items) or "Nothing is waiting for approval."
+    elif re.match(r"^bank\b[:\s]*", text, re.I) or _looks_like_bank_sms(text):
+        body = re.sub(r"^bank\b[:\s]*", "", text, flags=re.I)
+        r = autopilot.record_bank_sms(body, source="owner_whatsapp")
+        reply = {"delivered": f"✅ Matched to order #{r.get('order_id')} and the files were sent.",
+                 "confirmed": f"✅ Matched to order #{r.get('order_id')}. Reply APPROVE to send the files.",
+                 "waiting": "🏦 Saved. It will be matched when the customer sends the screenshot.",
+                 "ambiguous": "🏦 Several orders have this amount; see the message above.",
+                 "probable": f"🏦 Probably order #{r.get('order_id')}, but the ID/name do not match. Check before approving.",
+                 "duplicate": "This bank SMS was already recorded.",
+                 }.get(r["status"], f"Not recorded: {r.get('reason', '')}")
+    elif text.lower() in ("brief", "today", "report"):
+        reply = autopilot.build_brief()
     elif text.lower() in ("reset", "new chat"):
         db.clear_history("owner")
         reply = "New conversation started."
@@ -54,16 +66,25 @@ def handle_owner(msg):
     return reply
 
 
+def _looks_like_bank_sms(text):
+    """A forwarded bank SMS: an amount, the word received/credited, and a transaction ID."""
+    t = text.lower()
+    return bool(re.search(r"(pkr|rs\.?)\s*[\d,]+", t) and re.search(r"\b(received|credited|credit)\b", t)
+                and re.search(r"\b(tid|trx|txn|ref|rrn|transaction)\b", t))
+
+
 def handle_customer_text(msg):
     channel = f"wa:{msg['from']}"
     text = msg.get("text") or ""
     if not text.strip():
         return None
+    db.touch_customer(msg["from"], msg.get("name", ""))
     with _sales_lock:
         hist = db.history(channel, 12)
         db.add_message(channel, "user", text)
         try:
-            reply = agents.sales_agent(msg["from"], msg.get("name", "")).run(text, hist)
+            reply = agents.sales_agent(msg["from"], msg.get("name", "")).run(
+                text, hist, system_extra=autopilot.customer_summary(msg["from"]))
         except Exception:  # noqa: BLE001
             reply = "Thank you for your message! We will reply shortly. 🤍"
             _owner_notify(f"⚠️ The AI could not answer customer {msg['from']}: {text[:200]}")
@@ -89,6 +110,14 @@ def handle_payment(msg):
                   "read": {}, "transaction_id": ""}
     db.update_order(order["id"], status="payment_review",
                     payment={"transaction_id": result["transaction_id"], **result})
+    db.touch_customer(customer, msg.get("name", ""))
+    db.add_message(f"wa:{customer}", "user", "(sent a payment screenshot)")
+    bank = autopilot.match_for_order(db.get_order(order["id"]))
+    if bank and bank["status"] == "delivered":
+        return "delivered_by_bank"
+    if bank and bank["status"] == "confirmed":
+        whatsapp.send_text(customer, "✅ Payment confirmed, thank you! Your files will be sent in a few minutes.")
+        return "bank_confirmed"
     lines = "\n".join("✔ " + c for c in result["checks"]) + ("\n" if result["checks"] else "") + \
         "\n".join("✖ " + p for p in result["problems"])
     head = f"Order #{order['id']} — {order['customer_name'] or customer} — {order['total']:g} {order['currency']}\n" + \
@@ -102,7 +131,8 @@ def handle_payment(msg):
     if result["verdict"] == "passed":
         whatsapp.send_text(customer, "✅ Payment screenshot received, thank you! Your files will be sent in a few minutes.")
         tools.deliver_order.call({"order_id": order["id"]})  # creates approval + notifies owner
-        _owner_notify(f"💰 Payment looks correct\n{head}\n{lines}\n\nCheck your bank app, then reply APPROVE with the number above.")
+        _owner_notify(f"💰 Payment looks correct\n{head}\n{lines}\n\nWhen your bank's SMS arrives it is matched automatically "
+                      "(forward it here starting with BANK). Or check your bank app and reply APPROVE.")
         return "waiting_owner"
 
     whatsapp.send_text(customer, "Thank you! We received your screenshot. The owner will confirm the payment "

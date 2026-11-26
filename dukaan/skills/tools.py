@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-from .. import config, db
+from .. import autopilot, config, db
 from ..agent import tool
 from ..integrations import store, whatsapp
 from ..pdfgen import render
@@ -142,10 +142,17 @@ def deliver(order_id):
         for f in (p or {}).get("files", []):
             whatsapp.send_document(order["customer"], f, caption=p["name"])
             sent.append(Path(f).name)
-    store = config.load_profile().get("store_name", "")
-    whatsapp.send_text(order["customer"], f"✅ Thank you! Your order #{order_id} has been delivered. "
-                                           f"JazakAllah for shopping with {store} 🤍")
-    db.update_order(order_id, status="delivered")
+    store_name = config.load_profile().get("store_name", "")
+    names = [i["name"] for i in order["items"]]
+    db.touch_customer(order["customer"], order.get("customer_name") or "")
+    db.add_purchase(order["customer"], order["total"], names)
+    thanks = f"✅ Thank you! Your order #{order_id} has been delivered. JazakAllah for shopping with {store_name} 🤍"
+    nxt = autopilot.upsell_for(order["customer"], names)
+    if nxt:
+        thanks += (f"\n\nYou might also like: *{nxt['name']}* ({nxt['price']:g} {nxt['currency']}). "
+                   "Just reply if you'd like it.")
+    whatsapp.send_text(order["customer"], thanks)
+    db.update_order(order_id, status="delivered", paid_at=order.get("paid_at") or __import__("time").time())
     if order["payment"].get("transaction_id"):
         db.mark_payment_ref(order["payment"]["transaction_id"], order_id)
     return {"delivered": sent}
@@ -200,3 +207,25 @@ def store_profile():
         if m.get("account_number"):
             m["account_number"] = "****" + str(m["account_number"])[-4:]
     return prof
+
+
+# ======================= autopilot =======================
+
+
+@tool("todays_brief", "Get the store's daily report: yesterday's sales, unpaid orders, approvals, best seller, post idea.")
+def todays_brief():
+    return autopilot.build_brief()
+
+
+@tool("customers_list", "List customers with what they bought and how much they spent.")
+def customers_list():
+    return [{"whatsapp": c["wa"], "name": c["name"], "orders": c["orders"], "spent": c["spent"],
+             "bought": c["products"]} for c in db.list_customers(100)]
+
+
+@tool("record_bank_sms",
+      "Record a bank/wallet SMS the owner pasted (money received) and match it to a customer's order. "
+      "If it matches, the order is confirmed (and delivered if bank auto-delivery is on).",
+      {"sms_text": {"type": "string"}}, ["sms_text"])
+def record_bank_sms(sms_text):
+    return autopilot.record_bank_sms(sms_text, source="manager_chat")

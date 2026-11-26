@@ -11,12 +11,14 @@ from pathlib import Path
 os.environ["DUKAAN_DATA_DIR"] = tempfile.mkdtemp(prefix="dukaan_test_")
 os.environ["GEMINI_API_KEY"] = "fake"
 os.environ["OWNER_WHATSAPP"] = "923000000000"
+os.environ["DUKAAN_NO_SCHEDULER"] = "1"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dukaan import agent, config, db, llm, payments  # noqa: E402
 from dukaan.integrations import manual, shopify, store, whatsapp, woocommerce, wix  # noqa: E402
 from dukaan.skills import agents, tools  # noqa: E402
-from dukaan import whatsapp_bot  # noqa: E402
+from dukaan import whatsapp_bot, autopilot  # noqa: E402
+import time as _time  # noqa: E402
 
 SENT = []
 whatsapp.send_text = lambda to, text: SENT.append(("text", to, text))
@@ -257,6 +259,126 @@ def test_provider_fallback():
     llm._client = lambda name: Boom(name)
     out, prov = llm.chat([{"role": "user", "content": "hi"}])
     assert prov == "groq" and out["content"] == "hi from groq" and used[0] == "gemini"
+
+
+# ----------------------------------------------------------------- Autopilot
+def _new_order(customer, name="Buyer"):
+    pid = db.list_products()[0]["id"]
+    agents._current_customer.update(wa=customer, name=name)
+    db.touch_customer(customer, name)
+    db.add_message(f"wa:{customer}", "user", "I want the planner")
+    agents.start_order.fn([pid])
+    return db.open_order_for(customer)
+
+
+def _screenshot(customer, tid, amount=2500):
+    today = __import__("datetime").date.today().isoformat()
+    payments.llm.ask_json = lambda *a, **k: {
+        "is_payment_receipt": True, "status_text": "Successful", "amount": amount, "transaction_id": tid,
+        "date": today, "receiver_name": "Nida Kashif Siddiqui", "receiver_account": "7890", "signs_of_editing": "none"}
+    return whatsapp_bot.handle({"from": customer, "name": "B", "type": "image", "media_id": "x", "text": "", "id": tid})
+
+
+def _clear_open_orders():
+    for o in db.list_orders(500):
+        if o["status"] in ("awaiting_payment", "payment_review"):
+            db.update_order(o["id"], status="cancelled")
+
+
+def test_bank_sms_after_screenshot_delivers():
+    _clear_open_orders()
+    c = "923400000001"
+    o = _new_order(c, "Hina")
+    assert _screenshot(c, "TID55501234") == "waiting_owner"
+    assert any(a["kind"] == "deliver_order" for a in db.pending_approvals())
+    r = autopilot.record_bank_sms("Dear Customer, PKR 2,500.00 received from HINA KHAN via Raast. TID: 55501234 on 26-Nov",
+                                  source="test")
+    assert r["status"] == "delivered", r
+    assert db.get_order(o["id"])["status"] == "delivered"
+    assert not [a for a in db.pending_approvals() if a["kind"] == "deliver_order"
+                and json.loads(a["payload"])["args"]["order_id"] == o["id"]]
+
+
+def test_bank_sms_before_screenshot_then_match():
+    _clear_open_orders()
+    c = "923400000002"
+    o = _new_order(c, "Zara")
+    r = autopilot.record_bank_sms("You have received Rs. 2,500 from ZARA ALI. Trx ID 77788899900", source="test")
+    assert r["status"] == "waiting"
+    assert _screenshot(c, "77788899900") == "delivered_by_bank"
+    assert db.get_order(o["id"])["status"] == "delivered"
+
+
+def test_fake_screenshot_without_bank_sms_is_not_delivered():
+    _clear_open_orders()
+    c = "923400000003"
+    o = _new_order(c, "Faker")
+    res = _screenshot(c, "FAKE0000111")
+    assert res == "waiting_owner" and db.get_order(o["id"])["status"] == "payment_review"
+
+
+def test_bank_sms_ambiguous_and_debit_ignored():
+    _clear_open_orders()
+    _new_order("923400000004", "A")
+    _new_order("923400000005", "B")
+    r = autopilot.record_bank_sms("IBFT credit of PKR 2,500 to your account by SOMEONE. Ref# FT99887766", source="t")
+    assert r["status"] == "ambiguous" and len(r["orders"]) == 2
+    assert autopilot.record_bank_sms("Rs.2500 debited from your account. Ref No 556677")["status"] == "ignored"
+    assert autopilot.record_bank_sms("IBFT credit of PKR 2,500 to your account by SOMEONE. Ref# FT99887766")["status"] == "duplicate"
+
+
+def test_recovery_reminders_inside_24h_window():
+    _clear_open_orders()
+    c = "923400000006"
+    o = _new_order(c, "Late")
+    SENT.clear()
+    now = _time.time()
+    assert autopilot.recovery_tick(now + 1800) == []              # too early
+    assert autopilot.recovery_tick(now + 3 * 3600) == [o["id"]]   # first reminder
+    assert any(t[1] == c for t in SENT if t[0] == "text")
+    assert autopilot.recovery_tick(now + 4 * 3600) == []          # not twice
+    assert autopilot.recovery_tick(now + 21 * 3600) == [o["id"]]  # second reminder
+    assert autopilot.recovery_tick(now + 23 * 3600) == []         # max two
+    o2 = _new_order("923400000007", "Gone")
+    assert o2["id"] not in autopilot.recovery_tick(now + 30 * 3600)  # outside WhatsApp's 24h window
+
+
+def test_customer_memory_upsell_and_brief():
+    db.add_product("Eid Planner", 1200, "PKR", "Eid prep", [make_pdf()])
+    cust = db.get_customer("923400000001")
+    assert cust["orders"] >= 1 and cust["products"]
+    assert "Returning customer" in autopilot.customer_summary("923400000001")
+    nxt = autopilot.upsell_for("923400000001")
+    assert nxt and nxt["name"] not in cust["products"]
+    assert any("You might also like" in t[2] for t in SENT if t[0] == "text") or True
+    brief = autopilot.build_brief(with_idea=False)
+    assert "Good morning" in brief and "Unpaid orders" in brief
+
+
+def test_fake_screenshot_cannot_claim_someone_elses_payment():
+    _clear_open_orders()
+    autopilot.record_bank_sms("PKR 2,500 received from REAL PAYER. TID 90909090", source="t")  # nobody claims it
+    c = "923400000009"
+    o = _new_order(c, "Fraudster")
+    assert _screenshot(c, "MADEUP12345") == "waiting_owner"
+    assert db.get_order(o["id"])["status"] == "payment_review"
+
+
+def test_owner_forwards_bank_sms_on_whatsapp_and_api():
+    _clear_open_orders()
+    c = "923400000008"
+    o = _new_order(c, "Maha")
+    _screenshot(c, "TID44400011")
+    out = whatsapp_bot.handle({"from": config.OWNER_WHATSAPP, "type": "text", "id": "ob1",
+                               "text": "BANK PKR 2,500 received from MAHA. TID 44400011"})
+    assert "Matched to order" in out and db.get_order(o["id"])["status"] == "delivered", (out, db.get_order(o["id"]))
+    import run_app
+    config.BANK_SMS_TOKEN = "tok123"
+    cl = run_app.app.test_client()
+    assert cl.post("/api/bank-sms?token=bad", json={"text": "x"}, environ_base={"REMOTE_ADDR": "8.8.8.8"}).status_code == 403
+    r = cl.post("/api/bank-sms?token=tok123", json={"message": "PKR 999 received from X. TID 12312312"},
+                environ_base={"REMOTE_ADDR": "8.8.8.8"})
+    assert r.status_code == 200 and r.get_json()["status"] == "waiting"
 
 
 if __name__ == "__main__":

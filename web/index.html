@@ -13,6 +13,7 @@
 :root{--bg:#121014;--panel:#1C191E;--panel2:#26222A;--line:#2F2A33;--ink:#F3EEF0;--muted:#9E959B;--accent:#E0738F;--accent2:#F2B5C4;--gold:#E2B969;--ok:#5FC18A;--bad:#E86B6B;--shadow:0 20px 50px rgba(0,0,0,.45)}
 @media (prefers-color-scheme:light){:root{--bg:#FBF8F6;--panel:#FFFFFF;--panel2:#F2ECE9;--line:#E7DFDB;--ink:#221C1F;--muted:#7A6F74;--accent:#B2365A;--accent2:#D9879C;--gold:#B0832F;--ok:#2F8F5B;--bad:#C24141;--shadow:0 20px 50px rgba(60,30,40,.15)}}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font:16px/1.55 Inter,system-ui,sans-serif;overflow:hidden}
 button,input,textarea,select{font:inherit;color:inherit}
@@ -156,6 +157,8 @@ main{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:8px 16px 16px}
   <button class="nav" data-go="new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New chat</button>
   <button class="nav" data-go="approvals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>Approvals<span class="n" id="navN" hidden></span></button>
   <button class="nav" data-go="orders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>Orders</button>
+  <button class="nav" data-go="bank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-6 9 6M5 10v8M19 10v8M9 10v8M15 10v8M3 20h18"/></svg>Bank payments</button>
+  <button class="nav" data-go="customers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.8c2 .8 3.2 2.6 3.5 5.2"/></svg>Customers</button>
   <button class="nav" data-go="products"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/></svg>Products</button>
   <button class="nav" data-go="skills"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 15.6 7.1 18.2l.9-5.5-4-3.9 5.5-.8z"/></svg>Skills</button>
   <button class="nav" data-go="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1c.6.5 1.3.9 2 1.2L10 21h4l.5-2.6c.7-.3 1.4-.7 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg>Store settings</button>
@@ -180,6 +183,8 @@ const ICON = {
   bag:'<svg viewBox="0 0 120 120"><path d="M42 40c0-12 8-20 18-20s18 8 18 20" fill="none" stroke="#E2B969" stroke-width="9" stroke-linecap="round"/><rect x="18" y="38" width="84" height="72" rx="24" fill="#D9587A"/><ellipse cx="48" cy="70" rx="6" ry="9" fill="#fff"/><ellipse cx="72" cy="70" rx="6" ry="9" fill="#fff"/></svg>'
 };
 const CHIPS = [
+  ["🌅","Today","__brief__"],
+  ["🏦","Bank SMS","__bank__"],
   ["✨","New product","Make a printable product: [what it is], for [who], in [English/Urdu], [A4/A5], about [number] pages."],
   ["✍️","Listing & SEO","Write the title, description and tags for my product: "],
   ["📣","Marketing","Write this week's Instagram, TikTok and Facebook posts with hashtags for my products."],
@@ -304,7 +309,11 @@ $("#fileIn").onchange=async e=>{
   e.target.value="";
 };
 $("#chips").innerHTML=CHIPS.map(([i,l,p],k)=>`<button class="chip" data-k="${k}"><span>${i}</span>${l}</button>`).join("");
-$("#chips").onclick=e=>{ const c=e.target.closest(".chip"); if(!c) return; input.value=CHIPS[c.dataset.k][2]; autosize(); updateAct(); input.focus(); };
+$("#chips").onclick=async e=>{ const c=e.target.closest(".chip"); if(!c) return; const v=CHIPS[c.dataset.k][2];
+  if(v==="__brief__"){ const t=document.createElement("div"); showThread(); t.className="msg ai"; t.innerHTML='<div class="thinking"><i></i><i></i><i></i>&nbsp;Preparing today’s brief…</div>'; $("#thread").appendChild(t); scrollEnd();
+    const r=await api("/api/brief?idea=1"); t.remove(); addMsg("assistant", r.text.replace(/\*([^*]+)\*/g,"**$1**")); return; }
+  if(v==="__bank__"){ openSheet("bank"); return; }
+  input.value=v; autosize(); updateAct(); input.focus(); };
 
 /* -------- status -------- */
 function setStatus(s){
@@ -329,7 +338,7 @@ drawer.onclick=e=>{ const b=e.target.closest("[data-go]"); if(!b) return; openDr
 $("#sheetClose").onclick=()=>$("#sheet").classList.remove("on");
 
 async function openSheet(kind){
-  const body=$("#sheetBody"); $("#sheetTitle").textContent={approvals:"Approvals",orders:"Orders",products:"Products",skills:"Skills",settings:"Store settings"}[kind];
+  const body=$("#sheetBody"); $("#sheetTitle").textContent={approvals:"Approvals",orders:"Orders",products:"Products",skills:"Skills",settings:"Store settings",bank:"Bank payments",customers:"Customers"}[kind];
   body.innerHTML='<div class="muted">Loading…</div>'; $("#sheet").classList.add("on");
   if(kind==="approvals"){
     const list=await api("/api/approvals");
@@ -359,6 +368,22 @@ async function openSheet(kind){
       +(r.listings.length?`<h4>Ready-to-paste listings</h4>`+r.listings.map(l=>`<div class="card"><h4>${esc(l.name)}</h4><pre>${esc(l.text)}</pre></div>`).join(""):"");
     $("#pAdd").onclick=async()=>{ if(!$("#pN").value) return toast("Add a name");
       await api("/api/products",{method:"POST",body:JSON.stringify({name:$("#pN").value,price:$("#pP").value,description:$("#pD").value,files:$("#pF").value?[$("#pF").value]:[]})}); toast("Product added"); openSheet("products"); };
+  }
+  if(kind==="bank"){
+    const rows=await api("/api/bank");
+    body.innerHTML=`<div class="card"><h4>Paste your bank's SMS</h4><div class="m">When money arrives, paste the bank or wallet SMS here (or forward it on WhatsApp starting with BANK). It is matched to the customer's order, and a real bank SMS means the files go out at once. A fake screenshot can never match.</div>
+      <div class="field" style="margin-top:10px"><textarea id="bankText" placeholder="PKR 2,500 received from AYESHA KHAN ... TID 1234567890"></textarea></div>
+      <div class="row"><button class="btn main" id="bankGo">Match payment</button></div><div id="bankOut" class="m" style="margin-top:8px"></div></div>
+      <div class="card"><h4>Automatic (optional)</h4><div class="m">Install an "SMS forwarder" app on the phone that gets your bank SMS, filter it to your bank's sender name, and send to:<br><code>${esc(location.origin)}/api/bank-sms?token=YOUR_BANK_SMS_TOKEN</code><br>Set BANK_SMS_TOKEN in .env first.</div></div>
+      <h4>Recent bank payments</h4>`+(rows.length?rows.map(b=>`<div class="card"><h4>${b.amount} · ${esc(b.sender||"unknown sender")}</h4><div class="m">Ref ${esc(b.ref||"-")} · ${new Date(b.created*1000).toLocaleString()}</div><div class="${b.order_id?"ok":"m"}">${b.order_id?`✔ Order #${b.order_id} — ${esc(b.how)}`:"Waiting for a matching order"}</div></div>`).join(""):'<div class="muted">No bank payments recorded yet.</div>');
+    $("#bankGo").onclick=async()=>{ const t=$("#bankText").value.trim(); if(!t) return;
+      const r=await api("/api/bank-sms",{method:"POST",body:JSON.stringify({text:t})});
+      const msg={delivered:`✅ Matched to order #${r.order_id} and the files were sent.`,confirmed:`✅ Matched to order #${r.order_id}. Approve to send the files.`,waiting:"🏦 Saved. It will match when the customer sends the screenshot.",ambiguous:"Several orders have this amount. Check Approvals.",probable:`Probably order #${r.order_id}, but the ID/name do not match. Check before approving.`,duplicate:"Already recorded.",ignored:"Not an incoming payment (or no amount found)."}[r.status]||JSON.stringify(r);
+      $("#bankOut").textContent=msg; toast(msg); refresh(); setTimeout(()=>openSheet("bank"),1500); };
+  }
+  if(kind==="customers"){
+    const rows=await api("/api/customers");
+    body.innerHTML=rows.length?rows.map(c=>`<div class="card"><h4>${esc(c.name||c.wa)}</h4><div class="m">+${esc(c.wa)} · ${c.orders} order(s) · spent ${c.spent}</div>${c.products.length?`<div class="m">Bought: ${esc(c.products.join(", "))}</div>`:""}</div>`).join(""):'<div class="card"><h4>No customers yet</h4><div class="m">Everyone who messages your WhatsApp appears here, with what they bought. Returning customers are greeted by name and offered products they do not have yet.</div></div>';
   }
   if(kind==="skills"){
     const r=await api("/api/skills");

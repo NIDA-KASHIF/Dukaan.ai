@@ -18,6 +18,15 @@ It runs on **free AI**: Google Gemini, Groq or OpenRouter. Each user adds their 
 | 💬 **Sales (WhatsApp)** | Answers customers, creates orders, shares bank details, checks payment screenshots, sends the PDF |
 | 🧠 **New skills** | If you ask for work no agent covers, the Manager **writes itself a new skill** and reuses it next time |
 
+### 🚀 Dukaan Autopilot: the daily jobs you no longer do by hand
+
+| Problem | What Autopilot does |
+|---|---|
+| **Fake payment screenshots**, and checking every payment in the bank app yourself | **Bank SMS match.** Forward your bank's SMS to the bot (start it with `BANK`), paste it in **☰ → Bank payments**, or let an SMS-forwarder app send it automatically. It is matched to the order by **transaction ID**, or by **amount + payer name**. A real bank SMS means the files go out at once. A fake screenshot can never match money that did not arrive. When the match is not certain, you are asked instead. |
+| Customers who order and **never pay** | **Lost-sale recovery.** A polite reminder after 2 hours and a last one after 20 hours, in the customer's language, always inside WhatsApp's 24-hour reply window (so no paid templates are needed). |
+| Not knowing **who your customers are** | **Customer memory.** Every customer and what they bought (☰ → Customers). Returning customers are greeted as such and never offered what they already own. After delivery, one suitable next product is suggested. |
+| No time to check **how the store is doing** | **Morning brief** on WhatsApp at 9 am (and the 🌅 **Today** button): yesterday's and today's sales, sales won back by reminders, best seller, unpaid orders, approvals waiting, and a ready post idea for today. |
+
 ### 🛡️ Nothing goes live without your approval
 - Adding a product to your store or changing one → an **approval request** is created first.
 - Sending files to a customer → an **approval request** first (while `AUTO_DELIVER=false`).
@@ -104,7 +113,7 @@ Product images and downloadable files: Shopify and WooCommerce products are crea
 > **Note on your number:** if the number is currently used in the WhatsApp Business **app**, connecting it to the Cloud API usually moves it off the app. Some accounts are offered "coexistence", which keeps both working. Otherwise, use a separate number for the bot.
 
 **As the owner, you can send on WhatsApp:**
-`PENDING` (what is waiting for approval) · `APPROVE 5` · `REJECT 5` · `RESET` · or any task, e.g. *"make a new product"*.
+`PENDING` (what is waiting for approval) · `APPROVE 5` · `REJECT 5` · `BRIEF` (today's report) · `BANK <paste bank SMS>` · `RESET` · or any task, e.g. *"make a new product"*.
 
 ### ☁️ Running 24/7 (Render / Railway)
 - **Render:** on render.com choose **New → Blueprint** and select this repo (`render.yaml` sets everything up). Then add your keys. After deploying, add `/webhook` to the end of the link Render gives you and paste it into Meta. Open the Render link itself to use the app (log in with `APP_PASSWORD`).
@@ -130,6 +139,12 @@ dukaan/
 data/                 # your products, database, settings (never uploaded to GitHub)
 tests/                # offline tests (no keys needed): python tests/test_offline.py
 ```
+
+### 📲 Automatic bank SMS (optional)
+1. Set `BANK_SMS_TOKEN` in `.env` to a long random word.
+2. On the Android phone that receives your bank SMS, install any "SMS forwarder" app that can send SMS to a web address (webhook).
+3. Filter it to your **bank's sender name only** (e.g. `MEEZANBANK`, `HBL`, `8558`), so ordinary SMS cannot be forwarded.
+4. Send to `https://<your-app-address>/api/bank-sms?token=<BANK_SMS_TOKEN>` (JSON field `text`, `message` or `sms`, or the plain SMS text as the body).
 
 ## 🔒 Security
 - Never upload `.env` or `data/` to GitHub. `.gitignore` already excludes them.

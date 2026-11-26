@@ -12,7 +12,7 @@ from pathlib import Path
 
 from flask import Flask, abort, jsonify, redirect, request, send_from_directory, session
 
-from dukaan import agent, config, db
+from dukaan import agent, autopilot, config, db
 from dukaan.integrations import manual, store, whatsapp
 from dukaan.llm import NoProviderError
 from dukaan.skills import agents, tools
@@ -233,6 +233,40 @@ def api_save_profile():
     return jsonify(ok=True)
 
 
+# ------------------------------------------------------------------ Autopilot
+@app.get("/api/brief")
+@owner_only
+def api_brief():
+    return jsonify(text=autopilot.build_brief(with_idea=request.args.get("idea") == "1"))
+
+
+@app.get("/api/customers")
+@owner_only
+def api_customers():
+    return jsonify(db.list_customers())
+
+
+@app.get("/api/bank")
+@owner_only
+def api_bank_list():
+    return jsonify(db.bank_payments(50))
+
+
+@app.post("/api/bank-sms")
+def api_bank_sms():
+    """For you (logged in) or an SMS-forwarder app on your phone (with ?token=BANK_SMS_TOKEN)."""
+    token = request.args.get("token") or request.headers.get("X-Token", "")
+    allowed = (config.BANK_SMS_TOKEN and hmac.compare_digest(token, config.BANK_SMS_TOKEN)) or \
+        (session.get("ok") if PASSWORD else _local())
+    if not allowed:
+        abort(403)
+    data = request.get_json(silent=True) or request.form or {}
+    text = data.get("text") or data.get("message") or data.get("sms") or data.get("body") or request.get_data(as_text=True)
+    if not (text or "").strip():
+        return jsonify(error="empty"), 400
+    return jsonify(autopilot.record_bank_sms(text, source="sms_forwarder" if token else "app"))
+
+
 # ------------------------------------------------------------------ WhatsApp webhook
 @app.get("/webhook")
 def wa_verify():
@@ -262,6 +296,10 @@ def _safe(msg):
         handle(msg)
     except Exception as e:  # noqa: BLE001
         print("WhatsApp error:", e)
+
+
+if not config.env("DUKAAN_NO_SCHEDULER"):
+    autopilot.start()
 
 
 @app.get("/health")

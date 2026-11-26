@@ -88,6 +88,17 @@ OWNER_WHATSAPP = env("OWNER_WHATSAPP")  # e.g. 923001234567 (no +, no spaces)
 AUTO_DELIVER = env_bool("AUTO_DELIVER", False)
 PAYMENT_MAX_AGE_DAYS = int(env("PAYMENT_MAX_AGE_DAYS", "3") or 3)
 
+# ---------- Autopilot ----------
+# When your BANK's own SMS confirms the money (matched to the order), send the files at once.
+BANK_AUTO_DELIVER = env_bool("BANK_AUTO_DELIVER", True)
+BANK_SMS_TOKEN = env("BANK_SMS_TOKEN")  # secret for the SMS-forwarder app URL
+RECOVERY = env_bool("RECOVERY", True)  # remind customers who ordered but did not pay
+RECOVERY_FIRST_HOURS = float(env("RECOVERY_FIRST_HOURS", "2") or 2)
+RECOVERY_SECOND_HOURS = float(env("RECOVERY_SECOND_HOURS", "20") or 20)
+UPSELL = env_bool("UPSELL", True)  # suggest one related product after delivery
+BRIEF_HOUR = int(env("BRIEF_HOUR", "9") or 9)  # morning report hour (local time); -1 = off
+TIMEZONE = env("TIMEZONE", "Asia/Karachi")
+
 
 DEFAULT_PROFILE = {
     "store_name": "My Store",
