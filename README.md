@@ -21,7 +21,7 @@ It runs on **free AI**: Google Gemini, Groq or OpenRouter. Each user adds their 
 ### 🛡️ Nothing goes live without your approval
 - Adding a product to your store or changing one → an **approval request** is created first.
 - Sending files to a customer → an **approval request** first (while `AUTO_DELIVER=false`).
-- Approve in two ways: the **✅ Approve** button in the dashboard, or by sending `APPROVE 5` on WhatsApp.
+- Approve in two ways: the **Approve** button in the app (🔔 at the top right), or by sending `APPROVE 5` on WhatsApp.
 
 ### 💰 Payment screenshot checks
 The AI reads the screenshot and checks that it looks like a real receipt, the status is "Successful", the amount covers the order, the money went to **your** account (name or account number matches), the transaction ID is new (not reused), the date is within 3 days, and there are no visible signs of editing.
@@ -58,12 +58,14 @@ Add all three and the app switches to the next one automatically when one runs o
 pip install -r requirements.txt
 python -m playwright install chromium
 cp .env.example .env        # then add your key to .env
-streamlit run dashboard.py
+python run_app.py
 ```
-The dashboard opens in your browser at `http://localhost:8501`.
+The app opens in your browser at `http://localhost:8000`. It looks and works like a chat app: a greeting, quick-action buttons, a message box with **+** to attach files and a 🎤 button for voice typing (Urdu, English or Arabic). The ☰ menu has Approvals, Orders, Products, Skills and Store settings.
+
+**Open it on your phone:** set `APP_PASSWORD` in `.env`, restart, then open `http://<your-computer's-IP>:8000` on a phone on the same Wi-Fi (or use your server's link). Tap your browser's menu → **Add to Home screen** to use it like an app.
 
 ### 4. First steps
-Fill in your store name, bank details and policies under **⚙️ Store settings**. Then ask the **💬 Manager**, for example:
+Fill in your store name, bank details and policies under **☰ → Store settings**. Then type a request, or tap a quick-action button, for example:
 - *"Make a 30-day Ramadan planner in Urdu, A5 size"*
 - *"Make a 20-page kids' pack of ABC tracing and maths worksheets"*
 - *"Make a 25-page mandala coloring book"*
@@ -84,7 +86,7 @@ Set `STORE_PLATFORM` in `.env` (or leave it on `auto`).
 | **Shopify** | Lists products and orders, creates digital products, updates titles, descriptions and prices | Shopify admin → **Settings → Apps and sales channels → Develop apps → Create an app** → Admin API scopes `read_products`, `write_products`, `read_orders` → **Install** → copy the Admin API access token. Put `SHOPIFY_STORE` (e.g. `mystore.myshopify.com`) and `SHOPIFY_TOKEN` in `.env`. |
 | **WooCommerce** (WordPress) | Same as above | WordPress → **WooCommerce → Settings → Advanced → REST API → Add key** (Read/Write). Put `WOO_URL` (https://yourshop.com), `WOO_KEY` and `WOO_SECRET` in `.env`. |
 | **Wix** | Same as above; on Wix Catalog V3 the PDF is attached too | [manage.wix.com/account/api-keys](https://manage.wix.com/account/api-keys) → **Generate API Key** with **Wix Stores**, **Media Manager** and **eCommerce** permissions. `WIX_SITE_ID` is the long ID after `manage.wix.com/dashboard/` in your site's dashboard address. |
-| **Any other platform** (Etsy, Daraz, Gumroad, Payhip, Instagram shop, your own website…) | **Manual mode:** the AI writes complete, ready-to-paste listings (title, description, tags, price, files) into `data/listings/` and shows them in the dashboard. Sales and PDF delivery still run on WhatsApp. | Set `STORE_PLATFORM=manual` and `STORE_PLATFORM_NAME=Etsy` (or your platform). Nothing else needed. |
+| **Any other platform** (Etsy, Daraz, Gumroad, Payhip, Instagram shop, your own website…) | **Manual mode:** the AI writes complete, ready-to-paste listings (title, description, tags, price, files) into `data/listings/` and shows them under **☰ → Products**. Sales and PDF delivery still run on WhatsApp. | Set `STORE_PLATFORM=manual` and `STORE_PLATFORM_NAME=Etsy` (or your platform). Nothing else needed. |
 
 Product images and downloadable files: Shopify and WooCommerce products are created without images or attached files. Add those in your store admin, or let Dukaan AI deliver the PDF on WhatsApp.
 
@@ -92,8 +94,8 @@ Product images and downloadable files: Shopify and WooCommerce products are crea
 1. At [developers.facebook.com/apps](https://developers.facebook.com/apps), create an app and add **WhatsApp**.
 2. From **API Setup**, copy the `Phone number ID` and a token. For a token that does not expire, create a **System User** token.
 3. In `.env`, set `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `OWNER_WHATSAPP` (your own number, e.g. 923001234567) and `WHATSAPP_APP_SECRET` (App settings → Basic).
-4. Start the server: `python run_whatsapp.py`
-5. Make it reachable from the internet: `ngrok http 5000` or `cloudflared tunnel --url http://localhost:5000`
+4. Start the app: `python run_app.py` (the WhatsApp webhook is built in at `/webhook`).
+5. Make it reachable from the internet: `ngrok http 8000` or `cloudflared tunnel --url http://localhost:8000`. Set `APP_PASSWORD` first, because the app will then be reachable from outside.
 6. In Meta, go to **WhatsApp → Configuration → Webhook**:
    - URL: `https://<your-address>/webhook`
    - Verify token: `dukaan-verify` (or whatever you set in `.env`)
@@ -105,17 +107,17 @@ Product images and downloadable files: Shopify and WooCommerce products are crea
 `PENDING` (what is waiting for approval) · `APPROVE 5` · `REJECT 5` · `RESET` · or any task, e.g. *"make a new product"*.
 
 ### ☁️ Running 24/7 (Render / Railway)
-- **Render:** on render.com choose **New → Blueprint** and select this repo (`render.yaml` sets everything up). Then add your keys. After deploying, add `/webhook` to the end of the link Render gives you and paste it into Meta.
+- **Render:** on render.com choose **New → Blueprint** and select this repo (`render.yaml` sets everything up). Then add your keys. After deploying, add `/webhook` to the end of the link Render gives you and paste it into Meta. Open the Render link itself to use the app (log in with `APP_PASSWORD`).
 - **Railway:** choose **New Project → Deploy from GitHub**. The `Dockerfile` is used automatically. Add the `.env` keys under **Variables**, and mount a **Volume** at `/data`.
-- On the server, PDFs and orders are kept in `/data`. Make products in the dashboard on your computer, or place PDFs in `data/products` on the server.
+- On the server, PDFs and orders are kept in `/data`. Make products in the app on your computer, or place PDFs in `data/products` on the server.
 
 ---
 
 ## 📁 Project layout
 ```
-dashboard.py          # owner dashboard (Streamlit)
+run_app.py            # the app: chat interface + API + WhatsApp webhook (one server)
+web/                  # the chat interface (HTML), login page, app icon
 run_chat.py           # terminal chat
-run_whatsapp.py       # WhatsApp webhook server
 dukaan/
   agent.py            # agent engine + approval gate
   llm.py              # Gemini / Groq / OpenRouter with automatic fallback

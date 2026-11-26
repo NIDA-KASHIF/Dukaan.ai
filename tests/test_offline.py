@@ -205,11 +205,33 @@ def test_webhook_parse_and_verify():
         "messages": [{"from": "92300", "id": "w1", "type": "image", "image": {"id": "MEDIA1", "caption": "paid"}}]}}]}]}
     msgs = whatsapp.parse_webhook(payload)
     assert msgs[0]["media_id"] == "MEDIA1" and msgs[0]["name"] == "Ali"
-    import run_whatsapp
-    c = run_whatsapp.app.test_client()
+    import run_app
+    c = run_app.app.test_client()
     r = c.get("/webhook?hub.mode=subscribe&hub.verify_token=dukaan-verify&hub.challenge=42")
     assert r.data == b"42"
     assert c.get("/webhook?hub.mode=subscribe&hub.verify_token=wrong&hub.challenge=1").status_code == 403
+
+
+def test_app_chat_api_and_login():
+    import run_app
+    c = run_app.app.test_client()
+    assert c.get("/").status_code == 200  # local access without password
+    assert c.get("/api/status").get_json()["store"]
+    llm.chat = FakeLLM(["Salaam! Ready to help."])
+    r = c.post("/api/chat", json={"message": "hi"}).get_json()
+    assert r["reply"].startswith("Salaam") and "pending" in r["status"]
+    assert c.get("/api/history").get_json()[-1]["content"].startswith("Salaam")
+    tools.store_update_product.call({"product_id": "z", "name": "Z"})
+    aid = c.get("/api/approvals").get_json()[-1]["id"]
+    assert "rejected" in c.post(f"/api/approvals/{aid}/reject").get_json()["message"]
+    assert c.get("/", environ_base={"REMOTE_ADDR": "8.8.8.8"}).status_code == 403  # no password: remote blocked
+    run_app.PASSWORD = "secret"
+    assert c.get("/api/status").status_code == 401
+    c.post("/login", data={"password": "wrong"})
+    assert c.get("/api/status").status_code == 401
+    c.post("/login", data={"password": "secret"})
+    assert c.get("/api/status").status_code == 200
+    run_app.PASSWORD = ""
 
 
 def test_provider_fallback():

@@ -6,4 +6,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 ENV DUKAAN_DATA_DIR=/data PORT=8080
 # One worker so the database and approvals stay in one place; threads handle many chats.
-CMD gunicorn run_whatsapp:app --bind 0.0.0.0:${PORT} --workers 1 --threads 8 --timeout 180
+CMD gunicorn run_app:app --bind 0.0.0.0:${PORT} --workers 1 --threads 8 --timeout 180

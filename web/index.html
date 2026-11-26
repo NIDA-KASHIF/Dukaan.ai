@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="theme-color" content="#121014">
+<title>Dukaan AI</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#121014;--panel:#1C191E;--panel2:#26222A;--line:#2F2A33;--ink:#F3EEF0;--muted:#9E959B;--accent:#E0738F;--accent2:#F2B5C4;--gold:#E2B969;--ok:#5FC18A;--bad:#E86B6B;--shadow:0 20px 50px rgba(0,0,0,.45)}
+@media (prefers-color-scheme:light){:root{--bg:#FBF8F6;--panel:#FFFFFF;--panel2:#F2ECE9;--line:#E7DFDB;--ink:#221C1F;--muted:#7A6F74;--accent:#B2365A;--accent2:#D9879C;--gold:#B0832F;--ok:#2F8F5B;--bad:#C24141;--shadow:0 20px 50px rgba(60,30,40,.15)}}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 Inter,system-ui,sans-serif;overflow:hidden}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+.app{height:100dvh;display:flex;flex-direction:column;padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left)}
+/* top bar */
+.top{display:flex;align-items:center;gap:10px;padding:12px 16px}
+.round{width:48px;height:48px;border-radius:50%;background:var(--panel);border:1px solid var(--line);display:grid;place-items:center;flex:none;position:relative}
+.round svg{width:22px;height:22px}
+.pill{height:48px;padding:0 18px;border-radius:24px;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;gap:8px;font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.pill .dim{color:var(--muted);font-weight:500}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);flex:none}
+.dot.off{background:var(--bad)}
+.badge{position:absolute;top:-2px;right:-2px;min-width:20px;height:20px;border-radius:10px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;padding:0 5px}
+.grow{flex:1}
+/* main */
+main{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:8px 16px 16px}
+.empty{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:18px;padding-bottom:40px}
+.mascot{width:118px;height:118px;animation:float 3.6s ease-in-out infinite;filter:drop-shadow(0 14px 24px rgba(224,115,143,.35))}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.mascot .eye{animation:blink 5s infinite;transform-origin:center;transform-box:fill-box}
+@keyframes blink{0%,94%,100%{transform:scaleY(1)}96%{transform:scaleY(.1)}}
+.hello{font-size:clamp(24px,6vw,32px);line-height:1.35;font-weight:500;max-width:15em;text-wrap:balance}
+.hello b{color:var(--accent2);font-weight:600}
+.subhello{color:var(--muted);font-size:15px;max-width:26em}
+.thread{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.msg{max-width:88%;padding:12px 16px;border-radius:20px;word-wrap:break-word;overflow-wrap:anywhere}
+.me{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:6px;white-space:pre-wrap}
+.ai{align-self:flex-start;background:var(--panel);border:1px solid var(--line);border-bottom-left-radius:6px}
+.ai h3,.ai h4{font-size:16px;margin:8px 0 4px}.ai p{margin:6px 0}.ai ul,.ai ol{margin:6px 0 6px 20px}.ai li{margin:2px 0}
+.ai code{background:var(--panel2);padding:1px 6px;border-radius:6px;font-size:14px}
+.ai a{color:var(--accent2)}
+.rtl{direction:rtl;text-align:right;font-family:"Noto Nastaliq Urdu",Inter,serif;line-height:2.2}
+.who{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;margin-bottom:4px}
+.who svg{width:22px;height:22px}
+.file{display:flex;align-items:center;gap:12px;background:var(--panel2);border-radius:14px;padding:10px;margin-top:8px;text-decoration:none;color:var(--ink)}
+.file img{width:44px;height:60px;object-fit:cover;border-radius:6px;background:#fff}
+.file span{font-size:14px;font-weight:600}.file small{display:block;color:var(--muted);font-weight:400}
+.appr{align-self:stretch;background:var(--panel);border:1px solid var(--gold);border-radius:18px;padding:14px 16px}
+.appr .t{font-weight:700;color:var(--gold);font-size:14px;margin-bottom:6px}
+.appr pre{white-space:pre-wrap;font:14px/1.5 Inter,sans-serif;color:var(--ink);max-height:220px;overflow:auto}
+.row{display:flex;gap:10px;margin-top:12px}
+.btn{flex:1;height:44px;border-radius:14px;font-weight:600;background:var(--panel2);border:1px solid var(--line)}
+.btn.yes{background:var(--ok);color:#fff;border:0}.btn.no{color:var(--bad)}
+.btn.main{background:var(--accent);color:#fff;border:0}
+.thinking{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:14px}
+.thinking i{width:7px;height:7px;border-radius:50%;background:var(--accent2);animation:pulse 1.2s infinite}
+.thinking i:nth-child(2){animation-delay:.15s}.thinking i:nth-child(3){animation-delay:.3s}
+@keyframes pulse{0%,80%,100%{opacity:.25;transform:scale(.8)}40%{opacity:1;transform:scale(1.1)}}
+/* chips + composer */
+.bottom{padding:0 16px calc(12px + env(safe-area-inset-bottom))}
+.chips{display:flex;gap:10px;overflow-x:auto;scrollbar-width:none;padding:4px 0 12px;max-width:760px;margin:0 auto}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;height:48px;padding:0 18px;border-radius:24px;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;gap:8px;font-weight:500;font-size:15px}
+.chip svg{width:20px;height:20px;color:var(--muted)}
+.composer{max-width:760px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:34px;display:flex;align-items:flex-end;gap:8px;padding:8px;box-shadow:var(--shadow)}
+.composer textarea{flex:1;min-width:0;border:0;outline:0;background:transparent;resize:none;padding:12px 6px;max-height:160px;font-size:17px;line-height:1.4}
+.composer textarea::placeholder{color:var(--muted)}
+.cbtn{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--panel2)}
+.cbtn svg{width:24px;height:24px}
+.cbtn.send{background:var(--accent);color:#fff}
+.cbtn.rec{background:var(--bad);color:#fff;animation:pulse 1.2s infinite}
+.attached{max-width:760px;margin:0 auto 8px;display:flex;gap:8px;flex-wrap:wrap}
+.attached span{background:var(--panel2);border-radius:12px;padding:6px 10px;font-size:13px}
+/* drawer + sheets */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:.2s;z-index:20}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;bottom:0;left:0;width:min(320px,84vw);background:var(--panel);z-index:21;transform:translateX(-102%);transition:transform .25s;padding:calc(20px + env(safe-area-inset-top)) 14px 20px;display:flex;flex-direction:column;gap:4px;border-right:1px solid var(--line)}
+.drawer.on{transform:none}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:20px;padding:0 8px 16px}
+.brand svg{width:36px;height:36px}
+.nav{display:flex;align-items:center;gap:14px;padding:14px 12px;border-radius:14px;font-weight:500;text-align:left;width:100%}
+.nav:hover{background:var(--panel2)}
+.nav svg{width:22px;height:22px;color:var(--muted)}
+.nav .n{margin-left:auto;background:var(--accent);color:#fff;border-radius:10px;font-size:12px;padding:1px 8px}
+.sheet{position:fixed;inset:0;background:var(--bg);z-index:30;transform:translateY(100%);transition:transform .25s;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
+.sheet.on{transform:none}
+.sheet header{display:flex;align-items:center;gap:12px;padding:12px 16px}
+.sheet h2{font-size:20px}
+.sheet .body{flex:1;overflow-y:auto;padding:4px 16px calc(24px + env(safe-area-inset-bottom));max-width:760px;width:100%;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:14px 16px}
+.card h4{font-size:15px;margin-bottom:4px}.card .m{color:var(--muted);font-size:14px}
+.card pre{white-space:pre-wrap;font:13px/1.5 Inter,sans-serif;max-height:260px;overflow:auto;margin-top:8px}
+.ok{color:var(--ok)}.bad{color:var(--bad)}
+.field{display:flex;flex-direction:column;gap:6px}.field label{font-size:13px;color:var(--muted)}
+.field input,.field textarea,.field select{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;outline:0}
+.field textarea{min-height:90px;resize:vertical}
+.grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:16px;overflow:hidden;text-decoration:none;color:var(--ink)}
+.tile img{width:100%;aspect-ratio:3/4;object-fit:cover;background:#fff;display:block}
+.tile div{padding:8px 10px;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.muted{color:var(--muted);font-size:14px}
+.toast{position:fixed;left:50%;bottom:calc(110px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:14px;font-size:14px;opacity:0;transition:.25s;z-index:50;max-width:90vw}
+.toast.on{opacity:1;transform:translateX(-50%)}
+@media (min-width:900px){.msg{max-width:75%}}
+@media (prefers-reduced-motion:reduce){.mascot,.mascot .eye,.thinking i,.cbtn.rec{animation:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <button class="round" id="menuBtn" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <button class="pill" id="statusPill"><span class="dot" id="aiDot"></span><span id="aiName">Dukaan AI</span><span class="dim" id="storeName"></span></button>
+    <div class="grow"></div>
+    <button class="round" id="bellBtn" aria-label="Approvals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10.5 20a1.8 1.8 0 0 0 3 0"/></svg><span class="badge" id="badge" hidden>0</span></button>
+  </div>
+
+  <main id="main">
+    <div class="empty" id="empty">
+      <svg class="mascot" viewBox="0 0 120 120" aria-hidden="true">
+        <defs><linearGradient id="bag" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F2A0B5"/><stop offset=".55" stop-color="#D9587A"/><stop offset="1" stop-color="#9E2E4F"/></linearGradient>
+        <radialGradient id="shine" cx=".3" cy=".25" r=".6"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>
+        <path d="M42 40c0-12 8-20 18-20s18 8 18 20" fill="none" stroke="#E2B969" stroke-width="7" stroke-linecap="round"/>
+        <rect x="18" y="38" width="84" height="72" rx="24" fill="url(#bag)"/>
+        <rect x="18" y="38" width="84" height="72" rx="24" fill="url(#shine)"/>
+        <ellipse class="eye" cx="48" cy="70" rx="5.5" ry="8" fill="#fff"/><ellipse class="eye" cx="72" cy="70" rx="5.5" ry="8" fill="#fff"/>
+        <path d="M51 88q9 7 18 0" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="38" cy="84" r="5" fill="#FFC2D1" opacity=".7"/><circle cx="82" cy="84" r="5" fill="#FFC2D1" opacity=".7"/>
+      </svg>
+      <div class="hello" id="hello">Assalam o Alaikum! What shall we do for <b>your store</b> today?</div>
+      <div class="subhello">Ask in English, Urdu or Roman Urdu. I make products, write listings, run your store and sell on WhatsApp.</div>
+    </div>
+    <div class="thread" id="thread" hidden></div>
+  </main>
+
+  <div class="bottom">
+    <div class="chips" id="chips"></div>
+    <div class="attached" id="attached" hidden></div>
+    <div class="composer">
+      <button class="cbtn" id="plusBtn" aria-label="Attach files"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+      <textarea id="input" rows="1" placeholder="Ask me. Task me." aria-label="Message"></textarea>
+      <button class="cbtn" id="actBtn" aria-label="Voice"></button>
+      <input type="file" id="fileIn" multiple hidden>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<nav class="drawer" id="drawer">
+  <div class="brand"><svg viewBox="0 0 120 120"><path d="M42 40c0-12 8-20 18-20s18 8 18 20" fill="none" stroke="#E2B969" stroke-width="8" stroke-linecap="round"/><rect x="18" y="38" width="84" height="72" rx="24" fill="#D9587A"/><ellipse cx="48" cy="70" rx="6" ry="9" fill="#fff"/><ellipse cx="72" cy="70" rx="6" ry="9" fill="#fff"/></svg>Dukaan AI</div>
+  <button class="nav" data-go="new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>New chat</button>
+  <button class="nav" data-go="approvals"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>Approvals<span class="n" id="navN" hidden></span></button>
+  <button class="nav" data-go="orders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>Orders</button>
+  <button class="nav" data-go="products"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/></svg>Products</button>
+  <button class="nav" data-go="skills"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 15.6 7.1 18.2l.9-5.5-4-3.9 5.5-.8z"/></svg>Skills</button>
+  <button class="nav" data-go="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1c.6.5 1.3.9 2 1.2L10 21h4l.5-2.6c.7-.3 1.4-.7 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg>Store settings</button>
+  <div class="grow"></div>
+  <div class="muted" id="drawerStatus" style="padding:8px 12px"></div>
+  <a class="nav" href="/logout" id="logout" style="text-decoration:none;color:inherit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg>Log out</a>
+</nav>
+
+<section class="sheet" id="sheet" aria-modal="true" role="dialog">
+  <header><button class="round" id="sheetClose" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg></button><h2 id="sheetTitle"></h2></header>
+  <div class="body" id="sheetBody"></div>
+</section>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const ICON = {
+  mic:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+  send:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+  stop:'<svg viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>',
+  bag:'<svg viewBox="0 0 120 120"><path d="M42 40c0-12 8-20 18-20s18 8 18 20" fill="none" stroke="#E2B969" stroke-width="9" stroke-linecap="round"/><rect x="18" y="38" width="84" height="72" rx="24" fill="#D9587A"/><ellipse cx="48" cy="70" rx="6" ry="9" fill="#fff"/><ellipse cx="72" cy="70" rx="6" ry="9" fill="#fff"/></svg>'
+};
+const CHIPS = [
+  ["✨","New product","Make a printable product: [what it is], for [who], in [English/Urdu], [A4/A5], about [number] pages."],
+  ["✍️","Listing & SEO","Write the title, description and tags for my product: "],
+  ["📣","Marketing","Write this week's Instagram, TikTok and Facebook posts with hashtags for my products."],
+  ["📈","Store check-up","Review the products and orders on my store and tell me what to improve."],
+  ["🧾","Orders","Show me today's orders and anything waiting for my approval."],
+  ["🧠","Teach a skill","Learn a new skill: "]
+];
+let status = {}, files = [], busy = false, rec = null;
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, {headers: opts.body && !(opts.body instanceof FormData) ? {"Content-Type":"application/json"} : {}, ...opts});
+  if (r.status === 401) { location.href = "/login"; throw new Error("login"); }
+  return r.json();
+}
+function toast(t){ const el=$("#toast"); el.textContent=t; el.classList.add("on"); clearTimeout(el._t); el._t=setTimeout(()=>el.classList.remove("on"),2600); }
+const isRTL = t => (t.match(/[؀-ۿ]/g)||[]).length > (t.match(/[A-Za-z]/g)||[]).length;
+
+/* -------- markdown-lite + file cards -------- */
+function inline(s){
+  return esc(s).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/`([^`]+)`/g,"<code>$1</code>")
+    .replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+}
+function md(src){
+  let out="", list=null;
+  const close=()=>{ if(list){ out+=`</${list}>`; list=null; } };
+  for (const raw of src.split("\n")) {
+    const l = raw.trimEnd(); let m;
+    if (!l.trim()) { close(); continue; }
+    if ((m=l.match(/^#{1,3}\s+(.*)/))) { close(); out+=`<h4>${inline(m[1])}</h4>`; continue; }
+    if ((m=l.match(/^\s*[-*•]\s+(.*)/))) { if(list!=="ul"){close();out+="<ul>";list="ul";} out+=`<li>${inline(m[1])}</li>`; continue; }
+    if ((m=l.match(/^\s*\d+[.)]\s+(.*)/))) { if(list!=="ol"){close();out+="<ol>";list="ol";} out+=`<li>${inline(m[1])}</li>`; continue; }
+    close(); out+=`<p>${inline(l)}</p>`;
+  }
+  close(); return out;
+}
+function fileCards(text){
+  const names = [...new Set((text.match(/[\w\-. ]+\.pdf/gi)||[]).map(n=>n.trim().split("/").pop()))];
+  return names.filter(n=>files.includes(n)).map(n=>{
+    const cover = n.replace(/\.pdf$/i,"_cover.jpg");
+    return `<a class="file" href="/files/${encodeURIComponent(n)}" target="_blank"><img src="/files/${encodeURIComponent(cover)}" alt="" onerror="this.style.display='none'"><span>${esc(n)}<small>Open PDF</small></span></a>`;
+  }).join("");
+}
+
+/* -------- thread -------- */
+function showThread(){ $("#empty").hidden=true; $("#thread").hidden=false; }
+function scrollEnd(){ const m=$("#main"); m.scrollTop=m.scrollHeight; }
+function addMsg(role, text){
+  showThread();
+  const d=document.createElement("div");
+  d.className="msg "+(role==="user"?"me":"ai")+(isRTL(text)?" rtl":"");
+  if(role==="user") d.textContent=text;
+  else d.innerHTML=`<div class="who">${ICON.bag}Dukaan AI</div>${md(text)}${fileCards(text)}`;
+  $("#thread").appendChild(d); scrollEnd(); return d;
+}
+function addApproval(a){
+  showThread();
+  const d=document.createElement("div"); d.className="appr";
+  d.innerHTML=`<div class="t">🟡 Approval #${a.id} needed</div><pre>${esc(a.summary)}</pre>
+    <div class="row"><button class="btn no">Reject</button><button class="btn yes">Approve</button></div>`;
+  d.querySelector(".yes").onclick=()=>decide(a.id,"approve",d);
+  d.querySelector(".no").onclick=()=>decide(a.id,"reject",d);
+  $("#thread").appendChild(d); scrollEnd();
+}
+async function decide(id, action, el){
+  el && el.querySelectorAll("button").forEach(b=>b.disabled=true);
+  const r = await api(`/api/approvals/${id}/${action}`, {method:"POST"});
+  toast(r.message); setStatus(r.status);
+  if(el) el.querySelector(".row").outerHTML=`<div class="muted" style="margin-top:10px">${esc(r.message)}</div>`;
+}
+
+async function send(text){
+  text = text.trim(); if(!text || busy) return;
+  if(files.length===0) await loadFiles();
+  const att=[...$("#attached").querySelectorAll("span")].map(s=>s.dataset.path);
+  if(att.length) text += "\n\nAttached files: " + att.join(", ");
+  $("#attached").innerHTML=""; $("#attached").hidden=true;
+  addMsg("user", text);
+  $("#input").value=""; autosize(); updateAct();
+  busy=true;
+  const t=document.createElement("div"); t.className="msg ai";
+  t.innerHTML=`<div class="thinking"><i></i><i></i><i></i>&nbsp;Working on it…</div>`;
+  $("#thread").appendChild(t); scrollEnd();
+  try{
+    const r = await api("/api/chat",{method:"POST",body:JSON.stringify({message:text})});
+    await loadFiles(); t.remove();
+    addMsg("assistant", r.reply || r.error || "…");
+    (r.approvals||[]).forEach(addApproval);
+    setStatus(r.status);
+  }catch(e){ t.remove(); if(e.message!=="login") addMsg("assistant","⚠️ Could not reach Dukaan AI. Is the app still running?"); }
+  busy=false;
+}
+
+/* -------- composer -------- */
+const input=$("#input");
+function autosize(){ input.style.height="auto"; input.style.height=Math.min(input.scrollHeight,160)+"px"; input.classList.toggle("rtl",isRTL(input.value)); }
+function updateAct(){
+  const b=$("#actBtn"); const has=input.value.trim().length>0;
+  if(rec){ b.className="cbtn rec"; b.innerHTML=ICON.stop; b.ariaLabel="Stop"; }
+  else if(has){ b.className="cbtn send"; b.innerHTML=ICON.send; b.ariaLabel="Send"; }
+  else { b.className="cbtn"; b.innerHTML=ICON.mic; b.ariaLabel="Voice"; }
+}
+input.addEventListener("input",()=>{autosize();updateAct();});
+input.addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing&&matchMedia("(pointer:fine)").matches){e.preventDefault();send(input.value);} });
+$("#actBtn").onclick=()=>{ if(rec){rec.stop();return;} if(input.value.trim()) send(input.value); else voice(); };
+function voice(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ toast("Voice typing is not supported in this browser. Try Chrome."); return; }
+  rec=new SR(); let lang="ur-PK"; try{ lang=localStorage.getItem("voiceLang")||"ur-PK"; }catch(e){}
+  rec.lang=lang; rec.interimResults=true; const start=input.value;
+  rec.onresult=e=>{ input.value=start+[...e.results].map(r=>r[0].transcript).join(" "); autosize(); };
+  rec.onend=()=>{ rec=null; updateAct(); };
+  rec.onerror=e=>{ if(e.error==="not-allowed") toast("Allow the microphone to use voice."); };
+  rec.start(); updateAct();
+}
+$("#plusBtn").onclick=()=>$("#fileIn").click();
+$("#fileIn").onchange=async e=>{
+  const fd=new FormData(); [...e.target.files].forEach(f=>fd.append("files",f));
+  if(![...fd.keys()].length) return;
+  const r=await api("/api/upload",{method:"POST",body:fd});
+  const box=$("#attached"); box.hidden=false;
+  r.saved.forEach(p=>{ const s=document.createElement("span"); s.dataset.path=p; s.textContent="📎 "+p.split(/[\\/]/).pop(); box.appendChild(s); });
+  e.target.value="";
+};
+$("#chips").innerHTML=CHIPS.map(([i,l,p],k)=>`<button class="chip" data-k="${k}"><span>${i}</span>${l}</button>`).join("");
+$("#chips").onclick=e=>{ const c=e.target.closest(".chip"); if(!c) return; input.value=CHIPS[c.dataset.k][2]; autosize(); updateAct(); input.focus(); };
+
+/* -------- status -------- */
+function setStatus(s){
+  if(!s) return; status=s;
+  $("#aiDot").classList.toggle("off", !s.ai.length);
+  $("#aiName").textContent = s.ai.length ? s.ai[0][0].toUpperCase()+s.ai[0].slice(1) : "No AI key";
+  $("#storeName").textContent = s.store;
+  $("#hello").innerHTML = `Assalam o Alaikum! What shall we do for <b>${esc(s.store_name||"your store")}</b> today?`;
+  const n=s.pending; $("#badge").hidden=!n; $("#badge").textContent=n; $("#navN").hidden=!n; $("#navN").textContent=n;
+  $("#drawerStatus").innerHTML = `AI: ${s.ai.length?esc(s.ai.join(", ")):"add a key in .env"}<br>Store: ${esc(s.store)}<br>WhatsApp: ${s.whatsapp?"connected":"not connected"}<br>${s.auto_deliver?"Auto-delivery on":"You approve each delivery"}`;
+}
+async function loadFiles(){ try{ const r=await api("/api/products"); files=r.files.map(f=>f.name); return r; }catch(e){ return null; } }
+
+/* -------- drawer + sheets -------- */
+const drawer=$("#drawer"), scrim=$("#scrim");
+const openDrawer=v=>{ drawer.classList.toggle("on",v); scrim.classList.toggle("on",v); };
+$("#menuBtn").onclick=()=>openDrawer(true); scrim.onclick=()=>openDrawer(false);
+$("#bellBtn").onclick=()=>openSheet("approvals"); $("#statusPill").onclick=()=>openDrawer(true);
+drawer.onclick=e=>{ const b=e.target.closest("[data-go]"); if(!b) return; openDrawer(false);
+  if(b.dataset.go==="new"){ api("/api/reset",{method:"POST"}); $("#thread").innerHTML=""; $("#thread").hidden=true; $("#empty").hidden=false; }
+  else openSheet(b.dataset.go); };
+$("#sheetClose").onclick=()=>$("#sheet").classList.remove("on");
+
+async function openSheet(kind){
+  const body=$("#sheetBody"); $("#sheetTitle").textContent={approvals:"Approvals",orders:"Orders",products:"Products",skills:"Skills",settings:"Store settings"}[kind];
+  body.innerHTML='<div class="muted">Loading…</div>'; $("#sheet").classList.add("on");
+  if(kind==="approvals"){
+    const list=await api("/api/approvals");
+    body.innerHTML = list.length ? "" : '<div class="card"><h4>Nothing is waiting</h4><div class="m">When the AI wants to publish on your store or send files to a customer, it will ask you here.</div></div>';
+    list.forEach(a=>{ const d=document.createElement("div"); d.className="card";
+      d.innerHTML=`<h4>#${a.id} · ${esc(a.kind)}</h4><pre>${esc(a.summary)}</pre><div class="row"><button class="btn no">Reject</button><button class="btn yes">Approve</button></div>`;
+      d.querySelector(".yes").onclick=async()=>{await decide(a.id,"approve");openSheet("approvals");};
+      d.querySelector(".no").onclick=async()=>{await decide(a.id,"reject");openSheet("approvals");};
+      body.appendChild(d); });
+  }
+  if(kind==="orders"){
+    const list=await api("/api/orders");
+    body.innerHTML = list.length ? "" : '<div class="card"><h4>No WhatsApp orders yet</h4><div class="m">Orders from WhatsApp customers will appear here with their payment checks.</div></div>';
+    list.forEach(o=>{ const p=o.payment||{}; const d=document.createElement("div"); d.className="card";
+      d.innerHTML=`<h4>#${o.id} · ${esc(o.customer_name||o.customer)} · ${o.total} ${esc(o.currency)}</h4>
+        <div class="m">${esc(o.items.map(i=>i.name).join(", "))} · <b>${esc(o.status.replace("_"," "))}</b></div>
+        ${(p.checks||[]).map(c=>`<div class="ok">✔ ${esc(c)}</div>`).join("")}${(p.problems||[]).map(c=>`<div class="bad">✖ ${esc(c)}</div>`).join("")}
+        ${o.status!=="delivered"?'<div class="row"><button class="btn main">Send files now</button></div>':""}`;
+      const b=d.querySelector(".main"); if(b) b.onclick=async()=>{ b.disabled=true; await api(`/api/orders/${o.id}/deliver`,{method:"POST"}); toast("Files sent"); openSheet("orders"); };
+      body.appendChild(d); });
+  }
+  if(kind==="products"){
+    const r=await loadFiles();
+    body.innerHTML=`<h4>Made by the AI</h4>`+(r.files.length?`<div class="grid2">${r.files.map(f=>`<a class="tile" href="/files/${encodeURIComponent(f.name)}" target="_blank"><img src="/files/${encodeURIComponent(f.cover||"")}" alt="" onerror="this.style.visibility='hidden'"><div>${esc(f.name)}</div></a>`).join("")}</div>`:'<div class="muted">No files yet. Tap ✨ New product on the home screen.</div>')
+      +`<h4 style="margin-top:8px">Sold on WhatsApp</h4>`+(r.catalog.length?r.catalog.map(p=>`<div class="card"><h4>#${p.id} ${esc(p.name)} — ${p.price} ${esc(p.currency)}${p.active?"":" (hidden)"}</h4><div class="m">${esc(p.description)}</div><div class="m">${esc(p.files.map(f=>f.split(/[\\/]/).pop()).join(", "))}</div></div>`).join(""):'<div class="muted">No products yet.</div>')
+      +`<div class="card"><h4>Add a product</h4><div class="field"><label>Name</label><input id="pN"></div><div class="field"><label>Price</label><input id="pP" type="number" inputmode="decimal"></div><div class="field"><label>Description</label><textarea id="pD"></textarea></div><div class="field"><label>File</label><select id="pF">${r.files.map(f=>`<option>${esc(f.name)}</option>`).join("")}</select></div><div class="row"><button class="btn main" id="pAdd">Add product</button></div></div>`
+      +(r.listings.length?`<h4>Ready-to-paste listings</h4>`+r.listings.map(l=>`<div class="card"><h4>${esc(l.name)}</h4><pre>${esc(l.text)}</pre></div>`).join(""):"");
+    $("#pAdd").onclick=async()=>{ if(!$("#pN").value) return toast("Add a name");
+      await api("/api/products",{method:"POST",body:JSON.stringify({name:$("#pN").value,price:$("#pP").value,description:$("#pD").value,files:$("#pF").value?[$("#pF").value]:[]})}); toast("Product added"); openSheet("products"); };
+  }
+  if(kind==="skills"){
+    const r=await api("/api/skills");
+    body.innerHTML=Object.entries(r.builtin).map(([k,v])=>`<div class="card"><h4>${esc(k.replace("_"," "))}</h4><div class="m">${esc(v)}</div></div>`).join("")
+      +`<h4>Skills it learned</h4>`+(Object.keys(r.custom).length?Object.entries(r.custom).map(([k,v])=>`<div class="card"><h4>skill:${esc(k)}</h4><div class="m">${esc(v.when)}</div><div class="row"><button class="btn no" data-del="${esc(k)}">Delete</button></div></div>`).join(""):'<div class="muted">None yet. Ask for any new kind of work and it will teach itself.</div>')
+      +`<div class="card"><h4>Teach a new skill</h4><div class="field"><label>Name</label><input id="sN" placeholder="eid-card-maker"></div><div class="field"><label>When to use it</label><input id="sW"></div><div class="field"><label>Instructions</label><textarea id="sI"></textarea></div><div class="row"><button class="btn main" id="sAdd">Save skill</button></div></div>`;
+    body.querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{ await api("/api/skills/"+encodeURIComponent(b.dataset.del),{method:"DELETE"}); openSheet("skills"); });
+    $("#sAdd").onclick=async()=>{ if(!$("#sN").value||!$("#sI").value) return toast("Add a name and instructions");
+      await api("/api/skills",{method:"POST",body:JSON.stringify({name:$("#sN").value,when:$("#sW").value,instructions:$("#sI").value})}); toast("Skill saved"); openSheet("skills"); };
+  }
+  if(kind==="settings"){
+    const p=await api("/api/profile"); let vl="ur-PK"; try{ vl=localStorage.getItem("voiceLang")||"ur-PK"; }catch(e){}
+    const f=(id,label,val,area)=>`<div class="field"><label>${label}</label>${area?`<textarea id="${id}">${esc(val)}</textarea>`:`<input id="${id}" value="${esc(val)}">`}</div>`;
+    body.innerHTML=`<div class="card" style="display:flex;flex-direction:column;gap:12px">${f("sStore","Store name",p.store_name)}${f("sWeb","Website",p.website)}${f("sCur","Currency",p.currency)}${f("sAbout","What you sell",p.about,1)}${f("sTone","Tone with customers",p.tone)}${f("sPol","Policies (delivery, refunds, discounts)",p.policies,1)}
+      <div class="field"><label>Payment methods (JSON)</label><textarea id="sPay" style="min-height:140px;font-family:monospace;font-size:13px">${esc(JSON.stringify(p.payment_methods,null,2))}</textarea></div>
+      <div class="field"><label>Voice typing language</label><select id="sVoice"><option value="ur-PK">Urdu</option><option value="en-US">English</option><option value="ar-SA">Arabic</option></select></div>
+      <div class="row"><button class="btn main" id="sSave">Save settings</button></div></div><div class="muted">${esc(document.querySelector("#drawerStatus").innerText)}</div>`;
+    $("#sVoice").value=vl;
+    $("#sSave").onclick=async()=>{ let pay; try{ pay=JSON.parse($("#sPay").value); }catch(e){ return toast("Payment methods: invalid JSON"); }
+      try{ localStorage.setItem("voiceLang",$("#sVoice").value); }catch(e){}
+      await api("/api/profile",{method:"POST",body:JSON.stringify({store_name:$("#sStore").value,website:$("#sWeb").value,currency:$("#sCur").value,about:$("#sAbout").value,tone:$("#sTone").value,policies:$("#sPol").value,payment_methods:pay})});
+      toast("Saved"); refresh(); };
+  }
+}
+
+async function refresh(){ try{ setStatus(await api("/api/status")); }catch(e){} }
+(async()=>{
+  updateAct(); await refresh(); await loadFiles();
+  const h=await api("/api/history").catch(()=>[]);
+  h.forEach(m=>addMsg(m.role,m.content));
+  setInterval(refresh,30000);
+})();
+</script>
+</body>
+</html>

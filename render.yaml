@@ -4,12 +4,14 @@ services:
     name: dukaan-ai-whatsapp
     runtime: docker
     plan: starter            # a paid plan is needed for the disk below (orders/approvals are kept there)
-    healthCheckPath: /
+    healthCheckPath: /health
     disk:
       name: dukaan-data
       mountPath: /data
       sizeGB: 1
     envVars:
+      - key: APP_PASSWORD
+        sync: false
       - key: GEMINI_API_KEY
         sync: false
       - key: GROQ_API_KEY

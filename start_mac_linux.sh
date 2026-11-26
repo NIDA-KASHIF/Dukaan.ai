@@ -5,4 +5,4 @@ source .venv/bin/activate
 pip install -r requirements.txt
 python -m playwright install chromium
 if [ ! -f .env ]; then cp .env.example .env; echo "Open .env, add your free AI key, then run this again."; exit 0; fi
-streamlit run dashboard.py
+python run_app.py
