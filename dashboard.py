@@ -5,19 +5,20 @@ from pathlib import Path
 import streamlit as st
 
 from dukaan import agent, config, db
-from dukaan.integrations import whatsapp, wix
+from dukaan.integrations import manual, store, whatsapp
 from dukaan.llm import NoProviderError
 from dukaan.skills import agents, tools
 
 st.set_page_config(page_title="Dukaan AI", page_icon="🛍️", layout="wide")
 st.title("🛍️ Dukaan AI")
-st.caption("Your AI store manager — products, Wix website, listings, marketing and WhatsApp sales.")
+st.caption("Your AI store manager — products, your online store (Wix, Shopify, WooCommerce or any platform), listings, marketing and WhatsApp sales.")
 
 with st.sidebar:
     st.subheader("Connections")
     prov = config.configured_providers()
     st.write(("✅ AI: " + ", ".join(prov)) if prov else "❌ AI: add a free key in .env")
-    st.write("✅ Wix connected" if wix.enabled() else "⚪ Wix not connected")
+    plat = store.current()
+    st.write(f"🏬 Store: {plat.NAME}" + ("" if plat is not manual else " — listings saved to paste"))
     st.write("✅ WhatsApp connected" if whatsapp.enabled() else "⚪ WhatsApp not connected")
     st.write("🟢 Auto-deliver ON" if config.AUTO_DELIVER else "🛡️ Owner approves each delivery")
     pend = db.pending_approvals()
@@ -56,7 +57,7 @@ with tab_chat:
 with tab_appr:
     items = db.pending_approvals()
     if not items:
-        st.info("Nothing is waiting. When the AI wants to publish on Wix or send files, it will appear here.")
+        st.info("Nothing is waiting. When the AI wants to publish on your store or send files, it will appear here.")
     for a in items:
         with st.container(border=True):
             st.markdown(f"**#{a['id']} · {a['kind']}**")
@@ -116,6 +117,11 @@ with tab_products:
                 paths.append(str(dest))
             db.add_product(n, pr, config.load_profile().get("currency", "PKR"), d, paths)
             st.success("Added")
+    if store.current() is manual:
+        st.subheader("Ready-to-paste listings")
+        for f in manual.listing_files():
+            with st.expander(Path(f).name):
+                st.code(Path(f).read_text(encoding="utf-8"))
     st.subheader("Files made by the AI")
     for pdf in sorted(config.PRODUCTS_DIR.glob("*.pdf")):
         c1, c2 = st.columns([3, 1])

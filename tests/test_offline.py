@@ -14,7 +14,7 @@ os.environ["OWNER_WHATSAPP"] = "923000000000"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dukaan import agent, config, db, llm, payments  # noqa: E402
-from dukaan.integrations import whatsapp, wix  # noqa: E402
+from dukaan.integrations import manual, shopify, store, whatsapp, woocommerce, wix  # noqa: E402
 from dukaan.skills import agents, tools  # noqa: E402
 from dukaan import whatsapp_bot  # noqa: E402
 
@@ -56,9 +56,10 @@ def make_pdf():
 
 def test_publish_needs_approval_then_runs():
     calls = []
-    wix.create_digital_product = lambda *a, **k: calls.append(a) or {"id": "wix123", "name": a[0]}
+    real = manual.create_digital_product
+    manual.create_digital_product = lambda *a, **k: calls.append(a) or real(*a, **k)
     pdf = make_pdf()
-    llm.chat = FakeLLM([("wix_publish_product", {"name": "Ramadan Planner", "price": 2500,
+    llm.chat = FakeLLM([("store_publish_product", {"name": "Ramadan Planner", "price": 2500,
                                                  "description": "30 days", "pdf_path": pdf}),
                         "Saved for approval #1."])
     reply = agents.manager().run("Publish my Ramadan planner")
@@ -69,13 +70,14 @@ def test_publish_needs_approval_then_runs():
     assert any("Approval #" in s[2] for s in SENT if s[0] == "text"), "owner should be notified on WhatsApp"
     out = agent.run_approved(pend[0]["id"])
     assert out.startswith("✅") and calls
+    assert manual.listing_files() and "Ramadan Planner" in Path(manual.listing_files()[0]).read_text()
     assert any(p["name"] == "Ramadan Planner" for p in db.list_products())
 
 
 def test_reject_does_nothing():
     calls = []
-    wix.update_product = lambda *a, **k: calls.append(a)
-    tools.wix_update_product.call({"product_id": "x", "name": "New"})
+    manual.update_product = lambda *a, **k: calls.append(a)
+    tools.store_update_product.call({"product_id": "x", "name": "New"})
     aid = db.pending_approvals()[-1]["id"]
     agent.reject(aid)
     assert not calls and db.get_approval(aid)["status"] == "rejected"
@@ -127,9 +129,9 @@ def test_wrong_amount_and_receiver():
 
 
 def test_owner_commands_on_whatsapp():
-    tools.wix_update_product.call({"product_id": "y", "description": "Better text"})
+    tools.store_update_product.call({"product_id": "y", "description": "Better text"})
     aid = db.pending_approvals()[-1]["id"]
-    wix.update_product = lambda *a, **k: {"updated": True}
+    manual.update_product = lambda *a, **k: {"updated": True}
     out = whatsapp_bot.handle({"from": config.OWNER_WHATSAPP, "type": "text", "text": f"APPROVE {aid}", "id": "o1"})
     assert out.startswith("✅")
 
@@ -149,6 +151,52 @@ def test_delegate_and_custom_skill():
     assert "eid_cards" in tools.custom_skills()
     llm.chat = FakeLLM(["1. Eid Mubarak!"])
     assert "Eid" in agents.run_specialist("skill:eid_cards", "Make cards")
+
+
+class FakeResp:
+    def __init__(self, data, code=200):
+        self._d, self.status_code, self.text = data, code, json.dumps(data)
+
+    def json(self):
+        return self._d
+
+
+def test_platform_choice():
+    assert store.current() is manual
+    config.SHOPIFY_STORE, config.SHOPIFY_TOKEN = "demo", "tok"
+    assert store.current() is shopify
+    config.STORE_PLATFORM = "woocommerce"
+    assert store.current() is woocommerce
+    config.STORE_PLATFORM, config.SHOPIFY_STORE, config.SHOPIFY_TOKEN = "auto", "", ""
+
+
+def test_shopify_create_product():
+    sent = []
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        sent.append((url, json))
+        if "productCreate" in json["query"]:
+            return FakeResp({"data": {"productCreate": {"product": {"id": "gid://shopify/Product/1", "handle": "p",
+                             "variants": {"nodes": [{"id": "gid://shopify/ProductVariant/9"}]}}, "userErrors": []}}})
+        return FakeResp({"data": {"productVariantsBulkUpdate": {"userErrors": []}}})
+    config.SHOPIFY_STORE, config.SHOPIFY_TOKEN = "demo", "tok"
+    shopify.requests.post = fake_post
+    r = shopify.create_digital_product("Planner", 9.5, "Line one\nLine two", seo_keywords=["planner"])
+    assert r["id"].endswith("/1") and sent[0][0] == "https://demo.myshopify.com/admin/api/2025-07/graphql.json"
+    assert sent[1][1]["variables"]["v"][0]["price"] == "9.50"
+    assert sent[1][1]["variables"]["v"][0]["inventoryItem"]["requiresShipping"] is False
+    config.SHOPIFY_STORE, config.SHOPIFY_TOKEN = "", ""
+
+
+def test_woocommerce_create_product():
+    sent = []
+    config.WOO_URL, config.WOO_KEY, config.WOO_SECRET = "https://shop.test", "ck", "cs"
+    woocommerce.requests.request = lambda m, url, auth=None, json=None, params=None, timeout=None: (
+        sent.append((m, url, json)) or FakeResp({"id": 55, "permalink": "https://shop.test/p"}))
+    r = woocommerce.create_digital_product("Planner", 2500, "Nice planner")
+    assert r["id"] == 55 and sent[0][1] == "https://shop.test/wp-json/wc/v3/products"
+    assert sent[0][2]["virtual"] and sent[0][2]["downloadable"] and sent[0][2]["regular_price"] == "2500"
+    config.WOO_URL = config.WOO_KEY = config.WOO_SECRET = ""
 
 
 def test_webhook_parse_and_verify():

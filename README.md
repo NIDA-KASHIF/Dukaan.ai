@@ -1,6 +1,6 @@
-# 🛍️ Dukaan AI — AI Store Manager for Wix + WhatsApp
+# 🛍️ Dukaan AI — AI Store Manager for any online store + WhatsApp
 
-**Dukaan AI** is an AI manager for your online store. It **designs digital products itself** (planners, journals, worksheets, coloring books), writes their listings and SEO, publishes them to your Wix website, writes your social media posts, and sells on WhatsApp: it chats with customers, takes the order, checks the payment screenshot and sends the PDF.
+**Dukaan AI** is an AI manager for your online store. It **designs digital products itself** (planners, journals, worksheets, coloring books), writes their listings and SEO, publishes them to your online store (**Wix, Shopify, WooCommerce**, or **any other platform** through ready-to-paste listings), writes your social media posts, and sells on WhatsApp: it chats with customers, takes the order, checks the payment screenshot and sends the PDF.
 
 It runs on **free AI**: Google Gemini, Groq or OpenRouter. Each user adds their own free key.
 
@@ -14,12 +14,12 @@ It runs on **free AI**: Google Gemini, Groq or OpenRouter. Each user adds their 
 | 🎨 **Product Designer** | Builds **print-ready PDFs**: planners, journals, habit trackers, kids' worksheets (tracing, maths, word search), flashcards and coloring pages (mandalas, patterns, letters). English, Urdu and Arabic; A4, A5 or Letter |
 | ✍️ **Listing Writer** | Titles, descriptions, 13 SEO tags and price suggestions |
 | 📣 **Marketing** | Instagram / TikTok / Facebook captions, hashtags, video scripts, WhatsApp broadcasts, 7- or 30-day content plans |
-| 📈 **Store Growth** | Reviews your Wix store and orders, points out weak spots, suggests new products and better descriptions |
+| 📈 **Store Growth** | Reviews your store and orders, points out weak spots, suggests new products and better descriptions |
 | 💬 **Sales (WhatsApp)** | Answers customers, creates orders, shares bank details, checks payment screenshots, sends the PDF |
 | 🧠 **New skills** | If you ask for work no agent covers, the Manager **writes itself a new skill** and reuses it next time |
 
 ### 🛡️ Nothing goes live without your approval
-- Adding a product to Wix or changing one → an **approval request** is created first.
+- Adding a product to your store or changing one → an **approval request** is created first.
 - Sending files to a customer → an **approval request** first (while `AUTO_DELIVER=false`).
 - Approve in two ways: the **✅ Approve** button in the dashboard, or by sending `APPROVE 5` on WhatsApp.
 
@@ -75,12 +75,18 @@ To chat in the terminal instead: `python run_chat.py`
 
 ---
 
-## 🌐 Connect your Wix website (optional)
-1. Go to [manage.wix.com/account/api-keys](https://manage.wix.com/account/api-keys) and click **Generate API Key**. Give it the **Wix Stores**, **Media Manager** and **eCommerce / Orders** permissions.
-2. **Site ID:** open your site's dashboard. The long ID after `manage.wix.com/dashboard/` in the address bar is your Site ID.
-3. Put `WIX_API_KEY` and `WIX_SITE_ID` in `.env`.
+## 🏬 Connect your store (any platform)
 
-The app detects whether your store uses **Catalog V1** or **V3** and works with both. On V3 the PDF is also attached to the product, so Wix can sell it directly.
+Set `STORE_PLATFORM` in `.env` (or leave it on `auto`).
+
+| Platform | What Dukaan AI does | Setup |
+|---|---|---|
+| **Shopify** | Lists products and orders, creates digital products, updates titles, descriptions and prices | Shopify admin → **Settings → Apps and sales channels → Develop apps → Create an app** → Admin API scopes `read_products`, `write_products`, `read_orders` → **Install** → copy the Admin API access token. Put `SHOPIFY_STORE` (e.g. `mystore.myshopify.com`) and `SHOPIFY_TOKEN` in `.env`. |
+| **WooCommerce** (WordPress) | Same as above | WordPress → **WooCommerce → Settings → Advanced → REST API → Add key** (Read/Write). Put `WOO_URL` (https://yourshop.com), `WOO_KEY` and `WOO_SECRET` in `.env`. |
+| **Wix** | Same as above; on Wix Catalog V3 the PDF is attached too | [manage.wix.com/account/api-keys](https://manage.wix.com/account/api-keys) → **Generate API Key** with **Wix Stores**, **Media Manager** and **eCommerce** permissions. `WIX_SITE_ID` is the long ID after `manage.wix.com/dashboard/` in your site's dashboard address. |
+| **Any other platform** (Etsy, Daraz, Gumroad, Payhip, Instagram shop, your own website…) | **Manual mode:** the AI writes complete, ready-to-paste listings (title, description, tags, price, files) into `data/listings/` and shows them in the dashboard. Sales and PDF delivery still run on WhatsApp. | Set `STORE_PLATFORM=manual` and `STORE_PLATFORM_NAME=Etsy` (or your platform). Nothing else needed. |
+
+Product images and downloadable files: Shopify and WooCommerce products are created without images or attached files. Add those in your store admin, or let Dukaan AI deliver the PDF on WhatsApp.
 
 ## 💬 Connect WhatsApp (optional)
 1. At [developers.facebook.com/apps](https://developers.facebook.com/apps), create an app and add **WhatsApp**.
@@ -118,7 +124,7 @@ dukaan/
   skills/agents.py    # Manager, specialists, Sales agent
   skills/tools.py     # all tools
   pdfgen/             # printable PDF generator (24 page types)
-  integrations/       # Wix + WhatsApp APIs
+  integrations/       # Shopify, WooCommerce, Wix, manual mode, WhatsApp
 data/                 # your products, database, settings (never uploaded to GitHub)
 tests/                # offline tests (no keys needed): python tests/test_offline.py
 ```

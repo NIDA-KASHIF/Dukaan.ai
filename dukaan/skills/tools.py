@@ -4,7 +4,7 @@ from pathlib import Path
 
 from .. import config, db
 from ..agent import tool
-from ..integrations import whatsapp, wix
+from ..integrations import store, whatsapp
 from ..pdfgen import render
 
 # ======================= products made by the app =======================
@@ -37,7 +37,7 @@ def list_product_files():
 @tool("catalog_list", "List the products this store sells on WhatsApp, with id, price and files.")
 def catalog_list():
     return [{"id": p["id"], "name": p["name"], "price": p["price"], "currency": p["currency"],
-             "description": p["description"][:200], "files": p["files"], "wix_id": p["wix_id"]}
+             "description": p["description"][:200], "files": p["files"], "store_id": p["wix_id"]}
             for p in db.list_products()]
 
 
@@ -54,49 +54,52 @@ def catalog_add(name, price, pdf_paths, description=""):
     return {"added": True, "product_id": pid}
 
 
-# ======================= Wix store =======================
+# ======================= online store (Wix / Shopify / WooCommerce / manual) =======================
 
 
-@tool("wix_status", "Check if the Wix store is connected and which catalog version it uses.")
-def wix_status():
-    if not wix.enabled():
-        return {"connected": False, "help": "Add WIX_API_KEY and WIX_SITE_ID in .env"}
-    return {"connected": True, "catalog": wix.catalog_version()}
+@tool("store_status", "Check which store platform is connected (Wix, Shopify, WooCommerce or manual).")
+def store_status():
+    try:
+        return store.current().status()
+    except Exception as e:  # noqa: BLE001
+        return {"connected": False, "platform": store.name(), "error": str(e)}
 
 
-@tool("wix_list_products", "List products on the Wix website (name, price, description start, visibility).")
-def wix_list_products():
-    return wix.list_products()
+@tool("store_list_products", "List products on the online store (name, price, description start, status).")
+def store_list_products():
+    return store.current().list_products()
 
 
-@tool("wix_list_orders", "List recent orders from the Wix website.",
+@tool("store_list_orders", "List recent orders from the online store.",
       {"limit": {"type": "integer", "description": "How many, default 20"}})
-def wix_list_orders(limit=20):
-    return wix.list_orders(limit)
+def store_list_orders(limit=20):
+    return store.current().list_orders(limit)
 
 
 def _publish_summary(a):
-    return (f"Publish NEW product on Wix:\n• Name: {a.get('name')}\n• Price: {a.get('price')}\n"
+    return (f"Publish NEW product on {store.name()}:\n• Name: {a.get('name')}\n• Price: {a.get('price')}\n"
             f"• PDF: {Path(a.get('pdf_path') or '-').name}\n• Description:\n{(a.get('description') or '')[:700]}")
 
 
-@tool("wix_publish_product",
-      "Create a new digital product on the Wix website (and add it to the WhatsApp catalog).",
+@tool("store_publish_product",
+      "Create a new digital product on the online store (and add it to the WhatsApp catalog). "
+      "In manual mode it saves a ready-to-paste listing file.",
       {"name": {"type": "string"}, "price": {"type": "number"},
        "description": {"type": "string", "description": "Full product description, plain text with line breaks"},
        "pdf_path": {"type": "string"}, "image_paths": {"type": "array", "items": {"type": "string"}},
        "seo_keywords": {"type": "array", "items": {"type": "string"}}},
       ["name", "price", "description"], needs_approval=True, summary=_publish_summary)
-def wix_publish_product(name, price, description, pdf_path=None, image_paths=None, seo_keywords=None):
-    res = wix.create_digital_product(name, price, description, pdf_path, image_paths or [], seo_keywords or [])
+def store_publish_product(name, price, description, pdf_path=None, image_paths=None, seo_keywords=None):
+    res = store.current().create_digital_product(name, price, description, pdf_path, image_paths or [],
+                                                 seo_keywords or [])
     if pdf_path and Path(pdf_path).exists():
         db.add_product(name, price, config.load_profile().get("currency", "PKR"), description, [pdf_path],
-                       res.get("id") or "")
+                       str(res.get("id") or ""))
     return res
 
 
 def _update_summary(a):
-    parts = [f"UPDATE Wix product {a.get('product_id')}"]
+    parts = [f"UPDATE {store.name()} product {a.get('product_id')}"]
     if a.get("name"):
         parts.append(f"• New name: {a['name']}")
     if a.get("price") is not None:
@@ -106,12 +109,12 @@ def _update_summary(a):
     return "\n".join(parts)
 
 
-@tool("wix_update_product", "Change the name, description or price of an existing Wix product.",
+@tool("store_update_product", "Change the name, description or price of an existing store product.",
       {"product_id": {"type": "string"}, "name": {"type": "string"}, "description": {"type": "string"},
        "price": {"type": "number"}},
       ["product_id"], needs_approval=True, summary=_update_summary)
-def wix_update_product(product_id, name=None, description=None, price=None):
-    return wix.update_product(product_id, name, description, price)
+def store_update_product(product_id, name=None, description=None, price=None):
+    return store.current().update_product(product_id, name, description, price)
 
 
 # ======================= orders & approvals =======================

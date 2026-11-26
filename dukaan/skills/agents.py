@@ -5,6 +5,7 @@ import json
 from .. import config, db
 from ..agent import Agent, tool
 from ..pdfgen.pages import PAGE_TYPES_HELP
+from ..integrations import store
 from . import tools as T
 
 LANG_RULE = ("Always reply in the same language the person writes in (Urdu script, Roman Urdu or English). "
@@ -15,7 +16,7 @@ SPECIALISTS = {
     "product_designer": {
         "about": "Designs and builds printable PDF products: planners, journals, trackers, kids worksheets, "
                  "coloring books, flashcards. Give it the idea, audience, language, size and page count.",
-        "system": f"""You are a senior digital-product designer for Etsy/Wix printable shops.
+        "system": f"""You are a senior digital-product designer for printable-product shops (Etsy, Shopify, Wix, WooCommerce, Gumroad...).
 Turn the owner's idea into a complete, sellable product and BUILD it with the build_printable tool.
 How you work:
 1. Decide the audience, the promise (what problem it solves), title (and a short English title_en for the file name),
@@ -30,13 +31,13 @@ How you work:
         "tools": [T.build_printable, T.list_product_files],
     },
     "listing_writer": {
-        "about": "Writes product titles, descriptions, 13 SEO tags/keywords and price suggestions for Wix/Etsy listings.",
-        "system": f"""You are an e-commerce SEO copywriter for digital products (Etsy and Wix).
+        "about": "Writes product titles, descriptions, SEO tags/keywords and price suggestions for any platform (Etsy, Shopify, Wix, WooCommerce, Daraz, Gumroad...).",
+        "system": f"""You are an e-commerce SEO copywriter for digital products on any platform (Etsy, Shopify, Wix, WooCommerce, Daraz, Gumroad, Payhip...). Follow the target platform's limits.
 For each product give:
 - Title (max 140 chars, main keyword first, no keyword stuffing)
 - Description: hook line, what's included (bullets), who it is for, how it works (instant download / PDF on WhatsApp),
   print sizes, a note that it is a digital file and no physical item is shipped
-- 13 tags (each max 20 chars, multi-word phrases buyers search)
+- Tags: 13 for Etsy (each max 20 chars); for other platforms 10-15 keyword phrases buyers search
 - Suggested price with a short reason (compare to typical market prices; never invent competitor names or numbers you don't know)
 Only claim features the product really has. {LANG_RULE}""",
         "tools": [T.catalog_list, T.list_product_files, T.store_profile],
@@ -52,16 +53,16 @@ Use the store's real products and prices (call catalog_list / store_profile). Ne
         "tools": [T.catalog_list, T.store_profile],
     },
     "store_growth": {
-        "about": "Audits the Wix store and orders, finds what to improve (titles, descriptions, missing products, prices), "
+        "about": "Audits the online store and orders, finds what to improve (titles, descriptions, missing products, prices), "
                  "and proposes updates (each update needs owner approval).",
-        "system": f"""You are a growth manager for a Wix digital-products store. Goal: make it the best store in its niche.
-Read the Wix products, Wix orders and the WhatsApp orders. Then:
+        "system": f"""You are a growth manager for an online digital-products store (Wix, Shopify, WooCommerce or any platform). Goal: make it the best store in its niche.
+Check store_status, then read the store products, store orders and the WhatsApp orders. Then:
 1. List the top problems (weak titles, short descriptions, missing SEO, products without images, gaps in the range).
 2. Suggest 3-5 new product ideas based on what sells.
-3. For concrete fixes, call wix_update_product with the improved text (it waits for owner approval).
+3. For concrete fixes, call store_update_product with the improved text (it waits for owner approval).
 Be specific and honest; if the store is not connected, say what to connect. {LANG_RULE}""",
-        "tools": [T.wix_status, T.wix_list_products, T.wix_list_orders, T.orders_list, T.catalog_list,
-                  T.wix_update_product],
+        "tools": [T.store_status, T.store_list_products, T.store_list_orders, T.orders_list, T.catalog_list,
+                  T.store_update_product],
     },
 }
 
@@ -73,7 +74,7 @@ def run_specialist(name, task):
         if key not in skills:
             return {"error": f"No custom skill named {key}. Available: {list(skills)}"}
         agent = Agent(name, skills[key]["instructions"] + "\n\n" + LANG_RULE,
-                      [T.build_printable, T.catalog_list, T.store_profile, T.wix_list_products])
+                      [T.build_printable, T.catalog_list, T.store_profile, T.store_list_products])
         return agent.run(task)
     spec = SPECIALISTS.get(name)
     if not spec:
@@ -102,6 +103,7 @@ You run the whole store for the owner: products, website, listings, marketing, o
 
 About the store: {prof.get('about')}
 Currency: {prof.get('currency')}. Website: {prof.get('website') or 'not set'}.
+Online store platform: {store.name()} (in manual mode, publishing saves a ready-to-paste listing for the owner).
 Things the owner told you before:
 {notes}
 
@@ -111,7 +113,7 @@ Your team (use the delegate tool):
 How you work:
 - Understand what the owner wants, plan the steps, and do them yourself with tools and your team.
   Example "make and sell a Ramadan planner": product_designer builds the PDF -> listing_writer writes the listing ->
-  wix_publish_product (owner approves) -> catalog_add happens automatically -> marketing writes the posts.
+  store_publish_product (owner approves) -> catalog_add happens automatically -> marketing writes the posts.
 - If the owner asks for a kind of work no agent covers, use create_skill to teach yourself, then delegate to it.
 - Anything that changes the live website or sends files waits for the owner's approval. Never pretend something
   was published before it is approved and done. Tell the owner the approval number.
@@ -122,7 +124,7 @@ How you work:
 
 
 MANAGER_TOOLS = [delegate, T.build_printable, T.list_product_files, T.catalog_list, T.catalog_add,
-                 T.wix_status, T.wix_list_products, T.wix_list_orders, T.wix_publish_product, T.wix_update_product,
+                 T.store_status, T.store_list_products, T.store_list_orders, T.store_publish_product, T.store_update_product,
                  T.orders_list, T.approvals_list, T.deliver_order, T.remember, T.create_skill, T.store_profile]
 
 

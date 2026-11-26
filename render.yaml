@@ -16,6 +16,18 @@ services:
         sync: false
       - key: OPENROUTER_API_KEY
         sync: false
+      - key: STORE_PLATFORM
+        value: auto
+      - key: SHOPIFY_STORE
+        sync: false
+      - key: SHOPIFY_TOKEN
+        sync: false
+      - key: WOO_URL
+        sync: false
+      - key: WOO_KEY
+        sync: false
+      - key: WOO_SECRET
+        sync: false
       - key: WIX_API_KEY
         sync: false
       - key: WIX_SITE_ID

@@ -10,6 +10,7 @@ import requests
 
 from .. import config
 
+NAME = "Wix"
 BASE = "https://www.wixapis.com"
 _version_cache = {}
 
@@ -41,6 +42,10 @@ def catalog_version():
     if "v" not in _version_cache:
         _version_cache["v"] = _req("GET", "/stores/v3/provision/version").get("catalogVersion", "V1_CATALOG")
     return _version_cache["v"]
+
+
+def status():
+    return {"connected": True, "platform": NAME, "catalog": catalog_version()}
 
 
 # ---------------- products ----------------
