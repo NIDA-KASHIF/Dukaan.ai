@@ -100,6 +100,9 @@ To chat in the terminal instead: `python run_chat.py`
 
 ---
 
+## 📱 Use it on your phone, without a computer
+Put Dukaan AI on an online server once (Render or Railway, from your phone browser), then install it on your phone like an app: its own icon, full screen, and shortcuts to Approvals, Orders and Today's brief. It keeps answering WhatsApp customers 24/7. **Step-by-step guide: [MOBILE.md](MOBILE.md).**
+
 ## 🏬 Connect your store (any platform)
 
 Set `STORE_PLATFORM` in `.env` (or leave it on `auto`).

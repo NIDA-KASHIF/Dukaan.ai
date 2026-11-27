@@ -7,6 +7,11 @@
 <title>Dukaan AI</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/icon.svg">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dukaan AI">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Nastaliq+Urdu:wght@400;600&display=swap" rel="stylesheet">
 <style>
@@ -162,6 +167,7 @@ main{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:8px 16px 16px}
   <button class="nav" data-go="products"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/></svg>Products</button>
   <button class="nav" data-go="skills"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.5L12 15.6 7.1 18.2l.9-5.5-4-3.9 5.5-.8z"/></svg>Skills</button>
   <button class="nav" data-go="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1c.6.5 1.3.9 2 1.2L10 21h4l.5-2.6c.7-.3 1.4-.7 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z"/></svg>Store settings</button>
+  <button class="nav" id="installBtn" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M12 7v7M9 11l3 3 3-3"/></svg>Install on this phone</button>
   <div class="grow"></div>
   <div class="muted" id="drawerStatus" style="padding:8px 12px"></div>
   <a class="nav" href="/logout" id="logout" style="text-decoration:none;color:inherit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg>Log out</a>
@@ -434,10 +440,26 @@ async function openSheet(kind){
 }
 
 async function refresh(){ try{ setStatus(await api("/api/status")); }catch(e){} }
+
+/* -------- install as an app (Android / iPhone / desktop) -------- */
+let installEvt=null;
+const standalone=matchMedia("(display-mode: standalone)").matches||navigator.standalone;
+const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(()=>{});
+window.addEventListener("beforeinstallprompt",e=>{ e.preventDefault(); installEvt=e; $("#installBtn").hidden=false; });
+if(isIOS && !standalone) $("#installBtn").hidden=false;
+$("#installBtn").onclick=async()=>{ openDrawer(false);
+  if(installEvt){ installEvt.prompt(); const r=await installEvt.userChoice; if(r.outcome==="accepted"){ toast("Installed! Open Dukaan AI from your home screen."); $("#installBtn").hidden=true; } installEvt=null; }
+  else if(isIOS) toast("Tap the Share button, then 'Add to Home Screen'.");
+  else toast("Open your browser menu (⋮) and choose 'Install app' or 'Add to Home screen'."); };
+window.addEventListener("appinstalled",()=>{ $("#installBtn").hidden=true; });
 (async()=>{
   updateAct(); await refresh(); await loadFiles();
   const h=await api("/api/history").catch(()=>[]);
   h.forEach(m=>addMsg(m.role,m.content));
+  const open=new URLSearchParams(location.search).get("open");
+  if(open==="brief") document.querySelector('.chip[data-k="0"]').click();
+  else if(["approvals","orders","products","bank","customers","settings"].includes(open)) openSheet(open);
   setInterval(refresh,30000);
 })();
 </script>

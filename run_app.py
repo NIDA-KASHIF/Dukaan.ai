@@ -78,6 +78,25 @@ def icon():
     return send_from_directory(WEB, "icon.svg")
 
 
+@app.get("/static/<name>")
+def static_file(name):
+    if not name.endswith(".png"):
+        abort(404)
+    return send_from_directory(WEB, name, max_age=86400)
+
+
+@app.get("/sw.js")
+def service_worker():
+    r = send_from_directory(WEB, "sw.js", mimetype="application/javascript", max_age=0)
+    r.headers["Service-Worker-Allowed"] = "/"
+    return r
+
+
+@app.get("/offline.html")
+def offline():
+    return send_from_directory(WEB, "offline.html")
+
+
 @app.get("/files/<path:name>")
 @owner_only
 def files(name):

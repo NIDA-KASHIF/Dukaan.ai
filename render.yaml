@@ -1,7 +1,8 @@
 # Render.com blueprint: New > Blueprint > pick this repo.
 services:
   - type: web
-    name: dukaan-ai-whatsapp
+    name: dukaan-ai
+    region: singapore        # closest Render region to Pakistan
     runtime: docker
     plan: starter            # a paid plan is needed for the disk below (orders/approvals are kept there)
     healthCheckPath: /health
